@@ -103,7 +103,14 @@ CURRENT_CODE=$(grep "versionCode = " app/build.gradle.kts | head -1 | sed 's/[^0
 echo "Current version: $CURRENT_VERSION (code: $CURRENT_CODE)"
 
 # 2. Calculate next version
-IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+SUFFIX=""
+BASE_VERSION="$CURRENT_VERSION"
+if [[ "$CURRENT_VERSION" == *"-"* ]]; then
+    SUFFIX="-${CURRENT_VERSION#*-}"
+    BASE_VERSION="${CURRENT_VERSION%%-*}"
+fi
+
+IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
 
 if [ "$VERSION_BUMP" = "major" ]; then
     MAJOR=$((MAJOR + 1))
@@ -116,7 +123,7 @@ elif [ "$VERSION_BUMP" = "patch" ]; then
     PATCH=$((PATCH + 1))
 fi
 
-NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
+NEXT_VERSION="$MAJOR.$MINOR.$PATCH$SUFFIX"
 NEXT_CODE=$((CURRENT_CODE + 1))
 echo "Next version: $NEXT_VERSION (code: $NEXT_CODE)"
 
