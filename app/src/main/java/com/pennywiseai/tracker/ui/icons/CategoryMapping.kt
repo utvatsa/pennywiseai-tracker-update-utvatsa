@@ -168,6 +168,44 @@ object CategoryMapping {
         return categories[name]?.color ?: userColor ?: Color.Gray
     }
 
+    val subCategoryPalette = listOf(
+        Color(0xFF8D6E63), // Brown / warm mocha
+        Color(0xFFE57373), // Red / soft coral
+        Color(0xFF26A69A), // Teal
+        Color(0xFFFFB74D), // Amber / gold
+        Color(0xFF7E57C2), // Purple / violet
+        Color(0xFF29B6F6), // Cyan / sky blue
+        Color(0xFFFF7043), // Deep orange / terracotta
+        Color(0xFF9CCC65), // Light green
+        Color(0xFFEC407A), // Pink / rose
+        Color(0xFF5C6BC0), // Indigo
+        Color(0xFF78909C)  // Blue grey
+    )
+
+    /**
+     * Resolves the display color for a subcategory.
+     * Prefers explicit overrides or user styles, then falls back to a distinct
+     * curated palette using [index] so subcategories within a parent category
+     * have distinct, recognizable colors (e.g. brown, red, teal, amber).
+     */
+    fun subCategoryColor(
+        name: String,
+        overrideHex: String? = null,
+        index: Int = 0,
+        parentName: String? = null
+    ): Color {
+        if (!overrideHex.isNullOrBlank()) {
+            runCatching { Color(android.graphics.Color.parseColor(overrideHex)) }
+                .getOrNull()?.let { return it }
+        }
+        val userColor = userStyles[name]?.colorHex?.let { hex -> runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull() }
+        if (userColor != null && userStyles[name]?.customColor == true) return userColor
+        val builtin = categories[name]?.color
+        if (builtin != null) return builtin
+
+        return subCategoryPalette[Math.floorMod(index, subCategoryPalette.size)]
+    }
+
     /**
      * Built-in icon/colour by name. A renamed built-in (#823) is found through its
      * original name, carried in [userStyles], so every `categories[name]` call site

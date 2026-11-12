@@ -242,10 +242,11 @@ private fun CategoryBar(
                         .padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    category.subCategories.forEach { sub ->
+                    category.subCategories.forEachIndexed { index, sub ->
                         SubCategoryRow(
                             subCategory = sub,
                             parentCategory = category,
+                            index = index,
                             currency = currency,
                             onClick = { onSubCategoryClick(sub) }
                         )
@@ -277,10 +278,16 @@ private fun CategoryBar(
 private fun SubCategoryRow(
     subCategory: SubCategoryData,
     parentCategory: CategoryData,
+    index: Int,
     currency: String,
     onClick: () -> Unit
 ) {
-    val subColor = CategoryMapping.colorFor(subCategory.name, subCategory.color)
+    val subColor = CategoryMapping.subCategoryColor(
+        name = subCategory.name,
+        overrideHex = subCategory.color,
+        index = index,
+        parentName = parentCategory.name
+    )
 
     Column(
         modifier = Modifier
