@@ -1,6 +1,11 @@
 package com.pennywiseai.tracker.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,7 +56,8 @@ fun SplitEditor(
 ) {
     val splitsTotal = splits.fold(BigDecimal.ZERO) { acc, split -> acc + split.amount }
     val remaining = totalAmount - splitsTotal
-    val isBalanced = remaining.abs() <= BigDecimal("0.01")
+    val hasZeroSplit = splits.any { it.amount <= BigDecimal.ZERO }
+    val isBalanced = remaining.abs() <= BigDecimal("0.01") && !hasZeroSplit
 
     Card(
         modifier = modifier
@@ -145,6 +151,7 @@ fun SplitEditor(
                         }
                     },
                     canRemove = splits.size > 2,
+                    remaining = remaining,
                     currency = currency
                 )
             }
@@ -157,7 +164,7 @@ fun SplitEditor(
                     val newSplit = SplitItem(
                         id = 0,
                         category = nextCategory,
-                        amount = remaining.coerceAtLeast(BigDecimal.ZERO)
+                        amount = BigDecimal.ZERO
                     )
                     onSplitsChanged(splits + newSplit)
                 },
@@ -217,10 +224,16 @@ fun SplitEditor(
                     )
                     if (!isBalanced) {
                         Text(
-                            text = if (remaining > BigDecimal.ZERO) {
-                                stringResource(R.string.split_editor_remaining, CurrencyFormatter.formatCurrency(remaining, currency))
-                            } else {
-                                stringResource(R.string.split_editor_over, CurrencyFormatter.formatCurrency(remaining.abs(), currency))
+                            text = when {
+                                remaining.abs() <= BigDecimal("0.01") && hasZeroSplit -> {
+                                    stringResource(R.string.split_editor_zero_amount_warning)
+                                }
+                                remaining > BigDecimal.ZERO -> {
+                                    stringResource(R.string.split_editor_remaining, CurrencyFormatter.formatCurrency(remaining, currency))
+                                }
+                                else -> {
+                                    stringResource(R.string.split_editor_over, CurrencyFormatter.formatCurrency(remaining.abs(), currency))
+                                }
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
@@ -246,6 +259,7 @@ private fun SplitRow(
     onAmountChanged: (BigDecimal) -> Unit,
     onRemove: () -> Unit,
     canRemove: Boolean,
+    remaining: BigDecimal,
     currency: String,
     modifier: Modifier = Modifier
 ) {
@@ -389,6 +403,24 @@ private fun SplitRow(
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
+                trailingIcon = if (amountText.isNotEmpty()) {
+                    {
+                        IconButton(
+                            onClick = {
+                                amountText = ""
+                                onAmountChanged(BigDecimal.ZERO)
+                            },
+                            modifier = Modifier.size(Dimensions.Component.iconButton),
+                            shapes = IconButtonDefaults.shapes()
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.split_editor_clear_amount),
+                                modifier = Modifier.size(Dimensions.Icon.small)
+                            )
+                        }
+                    }
+                } else null,
                 shape = MaterialTheme.shapes.medium,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -414,6 +446,44 @@ private fun SplitRow(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     },
                     modifier = Modifier.size(Dimensions.Icon.medium)
+                )
+            }
+        }
+
+        // Fill remaining button on zero-amount rows when total filled < transaction total
+        val canFillRemaining = split.amount <= BigDecimal.ZERO && remaining > BigDecimal("0.01")
+        AnimatedVisibility(
+            visible = canFillRemaining,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    val formatted = remaining.stripTrailingZeros().toPlainString()
+                    amountText = formatted
+                    onAmountChanged(remaining)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                shapes = ButtonDefaults.shapes()
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimensions.Icon.small)
+                )
+                Spacer(modifier = Modifier.width(Spacing.xs))
+                Text(
+                    text = stringResource(
+                        R.string.split_editor_fill_remaining,
+                        CurrencyFormatter.formatCurrency(remaining, currency)
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

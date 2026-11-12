@@ -792,8 +792,9 @@ class TransactionDetailViewModel @Inject constructor(
 
     /**
      * Enables split mode for the current transaction.
-     * Creates two initial splits: one with the current category and half the amount,
-     * and another with "Others" and the remaining amount.
+     * Creates two initial splits: the current category with the full amount,
+     * and a second category ("Others" or first available category) initialized with zero amount,
+     * allowing the user to edit the primary category and easily fill remaining on the second.
      */
     fun enableSplitMode() {
         val transaction = _editableTransaction.value ?: _transaction.value ?: return
@@ -806,12 +807,15 @@ class TransactionDetailViewModel @Inject constructor(
 
         val currentCategory = transaction.category
         val totalAmount = transaction.amount
-        val halfAmount = totalAmount.divide(BigDecimal(2), MinorUnits.digits(transaction.currency), java.math.RoundingMode.HALF_UP)
-        val remainingAmount = totalAmount - halfAmount
+        val otherCategory = if (currentCategory == "Others") {
+            categories.value.firstOrNull { it.name != currentCategory }?.name ?: "General"
+        } else {
+            "Others"
+        }
 
         val initialSplits = listOf(
-            SplitItem(id = 0, category = currentCategory, amount = halfAmount),
-            SplitItem(id = 0, category = "Others", amount = remainingAmount)
+            SplitItem(id = 0, category = currentCategory, amount = totalAmount),
+            SplitItem(id = 0, category = otherCategory, amount = BigDecimal.ZERO)
         )
 
         _splits.value = initialSplits
