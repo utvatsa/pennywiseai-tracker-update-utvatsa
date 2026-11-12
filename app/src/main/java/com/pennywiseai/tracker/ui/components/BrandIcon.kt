@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.ui.icons.BrandIcons
 import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import com.pennywiseai.tracker.ui.icons.IconProvider
@@ -32,12 +31,11 @@ import com.pennywiseai.tracker.ui.icons.categoryLabel
 import com.pennywiseai.tracker.ui.icons.isValidCategoryOverride
 
 /**
- * Displays a brand icon with intelligent fallback following the 5-stage logo selector hierarchy:
+ * Displays a brand icon with intelligent fallback following the logo selector hierarchy:
  * 1. Brand First: Known merchant brand logos always outrank category icons/emojis/splits.
  * 2. Multi-Emoji Split Second: Composite multi-emoji badge when 2+ split categories exist.
  * 3. Single Emoji for Category Third: Custom emoji or clean standard builtin category emoji.
- * 4. Default for Transaction Type Fourth: e.g. Income.
- * 5. Default Fallback Fifth: Category vector icon or letter avatar.
+ * 4. Default Fallback Fourth: Category vector icon or letter avatar.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -46,7 +44,6 @@ fun BrandIcon(
     category: String? = null,
     splitCategories: List<String> = emptyList(),
     transactionId: Long? = null,
-    transactionType: TransactionType? = null,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     showBackground: Boolean = true
@@ -94,8 +91,8 @@ fun BrandIcon(
         return
     }
 
-    // Stages 3, 4, 5: Single emoji, transaction type default, or fallback
-    val iconResource = IconProvider.getTransactionIcon(merchantName, category, transactionType)
+    // Stages 3 & 4: Single emoji or fallback
+    val iconResource = IconProvider.getTransactionIcon(merchantName, category)
 
     val backgroundColor = when (iconResource) {
         is IconResource.VectorIcon -> iconResource.tint

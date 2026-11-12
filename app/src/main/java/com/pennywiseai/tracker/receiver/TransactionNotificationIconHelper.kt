@@ -9,19 +9,17 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
-import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.ui.icons.BrandIcons
 import com.pennywiseai.tracker.ui.icons.CategoryMapping
 
 /**
  * Generates circular Bitmaps for transaction OS notifications (NotificationCompat.setLargeIcon).
  *
- * 5-Stage Hierarchy:
+ * Hierarchy:
  * 1. Brand First: Known brand logo drawable (e.g. Swiggy, Uber, Netflix, Zepto)
  * 2. Multi-Emoji Split Second: Composite multi-emoji badge when 2+ split categories exist
  * 3. Single Emoji for Category Third: Category emoji drawn centered on a circle tinted with theme color
- * 4. Default for Transaction Type Fourth: e.g. Income ("💵" on emerald green circle)
- * 5. Default Fallback Fifth: Fallback placeholder ("🏷️") on neutral dark circle
+ * 4. Default Fallback Fourth: Fallback placeholder ("🏷️") on neutral dark circle
  */
 object TransactionNotificationIconHelper {
 
@@ -34,8 +32,7 @@ object TransactionNotificationIconHelper {
         merchantName: String,
         category: String?,
         sizePx: Int = NOTIFICATION_ICON_SIZE_PX,
-        splitCategories: List<String> = emptyList(),
-        transactionType: TransactionType? = null
+        splitCategories: List<String> = emptyList()
     ): Bitmap {
         val bitmap = createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -148,24 +145,26 @@ object TransactionNotificationIconHelper {
             return bitmap
         }
 
-        // Stage 4: Default for Transaction Type Fourth
-        if (transactionType == TransactionType.INCOME) {
+        // Original default for Income category: white "+" on green circle
+        if (effectiveCategory.equals("Income", ignoreCase = true)) {
             val bgColor = android.graphics.Color.parseColor("#4CAF50")
             paint.color = bgColor
             canvas.drawCircle(radius, radius, radius, paint)
 
             val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = sizePx * 0.45f
+                textSize = sizePx * 0.55f
+                color = android.graphics.Color.WHITE
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
                 textAlign = Paint.Align.CENTER
             }
             val fontMetrics = textPaint.fontMetrics
             val yOffset = (fontMetrics.descent - fontMetrics.ascent) / 2f - fontMetrics.descent
-            canvas.drawText("💵", radius, radius + yOffset, textPaint)
+            canvas.drawText("+", radius, radius + yOffset, textPaint)
 
             return bitmap
         }
 
-        // Stage 5: Default Fallback Fifth
+        // Stage 4: Default Fallback
         val bgColor = android.graphics.Color.parseColor(DEFAULT_FALLBACK_COLOR_HEX)
         paint.color = bgColor
         canvas.drawCircle(radius, radius, radius, paint)

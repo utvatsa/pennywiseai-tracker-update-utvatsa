@@ -49,7 +49,6 @@ import androidx.compose.ui.res.stringResource
 import com.pennywiseai.shared.domain.mapping.SharedCategoryMapping
 import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
-import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.builtinKey
 
 /**
@@ -134,12 +133,9 @@ object CategoryMapping {
         "Fitness" to "🏋️",
         "Insurance" to "🛡️",
         "Travel" to "✈️",
-        "Salary" to "💰",
-        "Income" to "💵",
         "Tax" to "🏛️",
         "Bank Charges" to "💸",
-        "Credit Card Payment" to "💳",
-        "Others" to "🏷️"
+        "Credit Card Payment" to "💳"
     )
 
     fun emojiFor(name: String): String? = userStyles[name]?.emoji?.takeIf { it.isNotBlank() }
@@ -147,8 +143,15 @@ object CategoryMapping {
     fun defaultEmojiFor(name: String): String? =
         builtinEmojis[name] ?: userStyles[name]?.builtinKey?.let { builtinEmojis[it] }
 
-    fun effectiveEmojiFor(name: String): String? =
-        emojiFor(name) ?: defaultEmojiFor(name)
+    fun effectiveEmojiFor(name: String): String? {
+        if (name == "Others" || userStyles[name]?.builtinKey == "Others" ||
+            name == "Income" || userStyles[name]?.builtinKey == "Income" ||
+            name == "Salary" || userStyles[name]?.builtinKey == "Salary"
+        ) {
+            return null
+        }
+        return emojiFor(name) ?: defaultEmojiFor(name)
+    }
 
     /**
      * Resolves the display color for a category. Prefers the user's assigned color
@@ -359,23 +362,22 @@ object IconProvider {
     }
 
     /**
-     * Get icon for a transaction, following the 5-stage logo selector hierarchy:
+     * Get icon for a transaction, following the logo selector hierarchy:
      * 1. Brand First (known merchant brand logos always outrank category icons/emojis)
      * 2. (Split categories handled by caller / BrandIcon)
      * 3. Single emoji for category (custom emoji or clean standard builtin emoji)
-     * 4. Default for transaction type (e.g. Income)
-     * 5. Default fallback icon
+     * 4. Default fallback icon
      */
-    @JvmOverloads
     fun getTransactionIcon(
         merchantName: String,
-        category: String?,
-        transactionType: TransactionType? = null
+        category: String?
     ): IconResource {
         // Stage 1: Brand First - Known brands always show their official brand logo
         BrandIcons.getIconResource(merchantName)?.let { iconRes ->
             return IconResource.DrawableResource(iconRes)
         }
+
+        // Stage 2 (Splits) handled by caller / BrandIcon
 
         // Stage 3: Single Emoji for Category
         val effectiveCategory = if (category.isValidCategoryOverride()) category!!
@@ -385,30 +387,7 @@ object IconProvider {
             return IconResource.Emoji(emoji, CategoryMapping.colorFor(effectiveCategory))
         }
 
-        // Stage 4: Default for Transaction Type
-        if (transactionType != null) {
-            when (transactionType) {
-                TransactionType.INCOME -> {
-                    val info = CategoryMapping.categories["Income"] ?: CategoryMapping.categories["Salary"]
-                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
-                }
-                TransactionType.TRANSFER -> {
-                    val info = CategoryMapping.categories["Banking"]
-                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
-                }
-                TransactionType.INVESTMENT -> {
-                    val info = CategoryMapping.categories["Investments"]
-                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
-                }
-                TransactionType.CREDIT -> {
-                    val info = CategoryMapping.categories["Credit Card Payment"]
-                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
-                }
-                TransactionType.EXPENSE -> {}
-            }
-        }
-
-        // Stage 5: Default Fallback
+        // Stage 4: Default Fallback
         val categoryInfo = CategoryMapping.categories[effectiveCategory]
             ?: CategoryMapping.categories["Others"]!!
 

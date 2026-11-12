@@ -6,6 +6,7 @@ import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class TransactionNotificationIconHelperTest {
@@ -33,14 +34,14 @@ class TransactionNotificationIconHelperTest {
         assertEquals("🏛️", CategoryMapping.effectiveEmojiFor("Tax"))
         assertEquals("💸", CategoryMapping.effectiveEmojiFor("Bank Charges"))
         assertEquals("💳", CategoryMapping.effectiveEmojiFor("Credit Card Payment"))
-        assertEquals("💰", CategoryMapping.effectiveEmojiFor("Salary"))
-        assertEquals("💵", CategoryMapping.effectiveEmojiFor("Income"))
-        assertEquals("🏷️", CategoryMapping.effectiveEmojiFor("Others"))
+        assertNull(CategoryMapping.effectiveEmojiFor("Salary"))
+        assertNull(CategoryMapping.effectiveEmojiFor("Income"))
+        assertNull(CategoryMapping.effectiveEmojiFor("Others"))
     }
 
     @Test
     fun `circular icon helper constants and fallback are valid`() {
         assertEquals(192, TransactionNotificationIconHelper.NOTIFICATION_ICON_SIZE_PX)
-        assertEquals("🏷️", CategoryMapping.effectiveEmojiFor("Others"))
+        assertNull(CategoryMapping.effectiveEmojiFor("Others"))
     }
 }

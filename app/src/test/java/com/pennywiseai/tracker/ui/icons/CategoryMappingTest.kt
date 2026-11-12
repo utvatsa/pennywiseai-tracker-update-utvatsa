@@ -4,6 +4,7 @@ import com.pennywiseai.tracker.ui.icons.IconProvider
 import com.pennywiseai.tracker.ui.icons.IconResource
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CategoryMappingTest {
@@ -142,10 +143,11 @@ class CategoryMappingTest {
     @Test
     fun testGetTransactionIcon_overrideToOthers_usesOthers() {
         val result = IconProvider.getTransactionIcon("Piri Piri Flaming Grill", "Others")
-        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
-            ?: throw AssertionError("Expected Emoji but got $result")
-        assertEquals("🏷️", emojiResult.emoji)
-        assertEquals(CategoryMapping.colorFor("Others"), emojiResult.tint)
+        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
+            ?: throw AssertionError("Expected VectorIcon but got $result")
+        val othersInfo = CategoryMapping.categories["Others"]!!
+        assertEquals(othersInfo.icon, iconResult.icon)
+        assertEquals(othersInfo.color, iconResult.tint)
     }
 
     // #760: a user category with an emoji renders that emoji; without one it
@@ -214,35 +216,46 @@ class CategoryMappingTest {
             "Fitness" to "🏋️",
             "Insurance" to "🛡️",
             "Travel" to "✈️",
-            "Salary" to "💰",
-            "Income" to "💵",
             "Tax" to "🏛️",
             "Bank Charges" to "💸",
-            "Credit Card Payment" to "💳",
-            "Others" to "🏷️"
+            "Credit Card Payment" to "💳"
         )
         for ((name, expectedEmoji) in builtins) {
             assertEquals(expectedEmoji, CategoryMapping.effectiveEmojiFor(name), "Missing or wrong emoji for $name")
         }
+        // Others, Income, and Salary must have null emoji to preserve original fork defaults
+        assertNull(CategoryMapping.effectiveEmojiFor("Others"), "Others must have null emoji")
+        assertNull(CategoryMapping.defaultEmojiFor("Others"), "Others must have null default emoji")
+        assertNull(CategoryMapping.effectiveEmojiFor("Income"), "Income must have null emoji")
+        assertNull(CategoryMapping.defaultEmojiFor("Income"), "Income must have null default emoji")
+        assertNull(CategoryMapping.effectiveEmojiFor("Salary"), "Salary must have null emoji")
+        assertNull(CategoryMapping.defaultEmojiFor("Salary"), "Salary must have null default emoji")
+    }
+
+    @Test
+    fun testGetTransactionIcon_incomeCategory_returnsOriginalVectorIcon() {
+        val result = IconProvider.getTransactionIcon("Axis Card Cashback", "Income")
+        val iconResult = result as? IconResource.VectorIcon
+            ?: throw AssertionError("Expected VectorIcon for Income category but got $result")
+        val incomeInfo = CategoryMapping.categories["Income"]!!
+        assertEquals(incomeInfo.icon, iconResult.icon)
+        assertEquals(incomeInfo.color, iconResult.tint)
+    }
+
+    @Test
+    fun testGetTransactionIcon_salaryCategory_returnsOriginalVectorIcon() {
+        val result = IconProvider.getTransactionIcon("Employer Corp", "Salary")
+        val iconResult = result as? IconResource.VectorIcon
+            ?: throw AssertionError("Expected VectorIcon for Salary category but got $result")
+        val salaryInfo = CategoryMapping.categories["Salary"]!!
+        assertEquals(salaryInfo.icon, iconResult.icon)
+        assertEquals(salaryInfo.color, iconResult.tint)
     }
 
     @Test
     fun testGetTransactionIcon_zeptoBrandLogoTakesPriorityOverCategory() {
         val result = IconProvider.getTransactionIcon("Zepto", "Cigarettes")
         assertTrue(result is IconResource.DrawableResource, "Zepto must return DrawableResource even with Cigarettes category")
-    }
-
-    @Test
-    fun testGetTransactionIcon_transactionTypeFallback() {
-        val incomeResult = IconProvider.getTransactionIcon(
-            "Unknown Payer",
-            null,
-            com.pennywiseai.tracker.data.database.entity.TransactionType.INCOME
-        )
-        assertTrue(
-            incomeResult is IconResource.Emoji || incomeResult is IconResource.VectorIcon,
-            "Expected Emoji or VectorIcon for INCOME type"
-        )
     }
 
     // Background callers decide from loaded rows, so an unmirrored userStyles can't mistranslate.
