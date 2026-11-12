@@ -127,7 +127,6 @@ internal fun TransactionReceipt(
                         category = transaction.category,
                         splitCategories = splitCategories,
                         transactionId = transaction.id,
-                        transactionType = transaction.transactionType,
                         size = Dimensions.Icon.hero,
                         showBackground = true
                     )

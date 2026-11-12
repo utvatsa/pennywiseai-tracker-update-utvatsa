@@ -228,8 +228,7 @@ fun TransactionItem(
                 showBackground = true,
                 category = transaction.category,
                 splitCategories = effectiveSplitCategories,
-                transactionId = transaction.id,
-                transactionType = transaction.transactionType
+                transactionId = transaction.id
             )
         },
         trailingContent = {

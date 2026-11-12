@@ -5,7 +5,7 @@ object DefaultCategoryData {
         val name: String,
         val colorHex: String,
         val isIncome: Boolean,
-        val emoji: String = "🏷️"
+        val emoji: String? = null
     )
 
     val ALL: List<CategorySeed> = listOf(
@@ -24,8 +24,8 @@ object DefaultCategoryData {
         CategorySeed("Fitness",            "#FF3278", false, "🏋️"),
         CategorySeed("Insurance",          "#0066CC", false, "🛡️"),
         CategorySeed("Travel",             "#00BCD4", false, "✈️"),
-        CategorySeed("Salary",             "#4CAF50", true, "💰"),
-        CategorySeed("Income",             "#4CAF50", true, "💵"),
-        CategorySeed("Others",             "#757575", false, "🏷️")
+        CategorySeed("Salary",             "#4CAF50", true, null),
+        CategorySeed("Income",             "#4CAF50", true, null),
+        CategorySeed("Others",             "#757575", false, null)
     )
 }

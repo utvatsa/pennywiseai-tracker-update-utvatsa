@@ -32,7 +32,14 @@ fun CategoryChip(
         horizontalArrangement = Arrangement.Start
     ) {
         // Emoji if the user picked one (#760), else clean standard builtin emoji, else the colored dot
-        val emoji = category.icon?.takeIf { it.isNotBlank() } ?: CategoryMapping.defaultEmojiFor(category.name)
+        val isNoEmojiBuiltin = category.name == "Others" || category.systemName == "Others" ||
+            category.name == "Income" || category.systemName == "Income" ||
+            category.name == "Salary" || category.systemName == "Salary"
+        val emoji = if (isNoEmojiBuiltin) {
+            null
+        } else {
+            category.icon?.takeIf { it.isNotBlank() } ?: CategoryMapping.defaultEmojiFor(category.name)
+        }
         if (emoji != null) {
             Box(modifier = Modifier.padding(end = if (showText) Spacing.xs else 0.dp)) {
                 EmojiGlyph(emoji, 16.dp)
