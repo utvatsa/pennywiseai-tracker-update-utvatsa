@@ -2,6 +2,7 @@ package com.pennywiseai.tracker.presentation.home
 
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionGroupEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionSplitEntity
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -11,7 +12,8 @@ sealed class HomeRecentItem {
     data class SingleTransaction(
         val transaction: TransactionEntity,
         val convertedAmount: BigDecimal? = null,
-        val splitCategories: List<String> = emptyList()
+        val splits: List<TransactionSplitEntity> = emptyList(),
+        val splitCategories: List<String> = splits.map { it.category }
     ) : HomeRecentItem() {
         override val sortTime: LocalDateTime get() = transaction.dateTime
     }

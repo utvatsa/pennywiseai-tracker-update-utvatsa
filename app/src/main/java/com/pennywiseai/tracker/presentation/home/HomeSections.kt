@@ -335,6 +335,7 @@ internal fun HomeRecentTransactionsList(
                     showTypeLabel = false,
                     profileAccountKeys = profileAccountKeys,
                     splitCategories = item.splitCategories,
+                    splits = item.splits,
                     onClick = { onTransactionClick(item.transaction.id) }
                 )
                 is HomeRecentItem.GroupItem -> GroupCard(

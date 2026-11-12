@@ -2,27 +2,47 @@ package com.pennywiseai.tracker.ui.components.cards
 
 import android.content.res.Resources
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.contacts.LocalMerchantDisplay
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionSplitEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.ui.LocalNavAnimatedVisibilityScope
 import com.pennywiseai.tracker.ui.LocalSharedTransitionScope
 import com.pennywiseai.tracker.ui.components.BrandIcon
+import com.pennywiseai.tracker.ui.components.CategoryIcon
+import com.pennywiseai.tracker.ui.components.EmojiGlyph
+import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import com.pennywiseai.tracker.ui.icons.categoryLabel
 import com.pennywiseai.tracker.ui.sharedElementIcon
 import com.pennywiseai.tracker.ui.theme.*
@@ -43,6 +63,7 @@ fun TransactionItem(
     listItemPosition: ListItemPosition = ListItemPosition.Single,
     profileAccountKeys: Map<Long, Set<String>> = emptyMap(),
     splitCategories: List<String> = emptyList(),
+    splits: List<TransactionSplitEntity> = emptyList(),
     onClick: () -> Unit = {},
     /** Optional long-press handler — used for bulk-edit selection entry. */
     onLongClick: (() -> Unit)? = null,
@@ -62,6 +83,21 @@ fun TransactionItem(
         TransactionType.TRANSFER -> colorScheme.transfer
         TransactionType.INVESTMENT -> colorScheme.investment
     }
+
+    val effectiveSplits = remember(splits, splitCategories, transaction.id) {
+        if (splits.isNotEmpty()) splits
+        else splitCategories.map {
+            TransactionSplitEntity(
+                transactionId = transaction.id,
+                category = it,
+                amount = BigDecimal.ZERO
+            )
+        }
+    }
+    val effectiveSplitCategories = remember(effectiveSplits) {
+        effectiveSplits.map { it.category }
+    }
+    var isExpanded by rememberSaveable(transaction.id) { mutableStateOf(false) }
 
     val dateTimeFormatter = if (showDate) AppDates.dayMonthTimeFormatter() else AppDates.pattern("h:mm a")
     val dateTimeText = remember(transaction.dateTime, dateTimeFormatter) {
@@ -88,11 +124,22 @@ fun TransactionItem(
 
     val resources = LocalContext.current.resources
     val categoryText = categoryLabel(transaction.category)
-    val subtitle = remember(transaction, categoryText, dateTimeText, isEffectivelyBusiness, AmountPrivacy.hidden) {
+    val splitCategoryLabels = effectiveSplits.map { categoryLabel(it.category) }
+    val splitCategoriesSummary = remember(splitCategoryLabels) {
+        if (splitCategoryLabels.size <= 2) {
+            splitCategoryLabels.joinToString(", ")
+        } else {
+            "${splitCategoryLabels.getOrNull(0) ?: ""}, ${splitCategoryLabels.getOrNull(1) ?: ""} +${splitCategoryLabels.size - 2}"
+        }
+    }
+    val subtitle = remember(transaction, categoryText, dateTimeText, isEffectivelyBusiness, AmountPrivacy.hidden, effectiveSplits.size, splitCategoriesSummary, isExpanded) {
         buildList {
             if (description != null) add(CurrencyFormatter.maskAmountsIn(description))
             add(dateTimeText)
-            if (transaction.category.isNotBlank() &&
+            if (effectiveSplits.size >= 2) {
+                add(splitCategoriesSummary)
+                add(resources.getString(R.string.txn_item_tag_split, effectiveSplits.size) + if (isExpanded) " \u25B4" else " \u25BE")
+            } else if (transaction.category.isNotBlank() &&
                 !transaction.category.equals("Uncategorized", ignoreCase = true)
             ) {
                 add(categoryText)
@@ -154,7 +201,11 @@ fun TransactionItem(
         contentPadding = Dimensions.Padding.cardCompact,
         onClick = {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            onClick()
+            if (effectiveSplits.size >= 2) {
+                isExpanded = !isExpanded
+            } else {
+                onClick()
+            }
         },
         onLongClick = onLongClick,
         containerColor = containerColor,
@@ -176,7 +227,7 @@ fun TransactionItem(
                 size = Dimensions.Icon.list,
                 showBackground = true,
                 category = transaction.category,
-                splitCategories = splitCategories,
+                splitCategories = effectiveSplitCategories,
                 transactionId = transaction.id
             )
         },
@@ -210,7 +261,87 @@ fun TransactionItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
+        },
+        expandedContent = if (effectiveSplits.size >= 2 && isExpanded) {
+            {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        thickness = 0.5.dp
+                    )
+                    effectiveSplits.forEach { split ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.xxs, vertical = Spacing.xxs),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                val emoji = CategoryMapping.effectiveEmojiFor(split.category)
+                                if (emoji != null && emoji.isNotBlank()) {
+                                    EmojiGlyph(emoji, Dimensions.Icon.small * 0.8f)
+                                } else {
+                                    CategoryIcon(category = split.category, size = Dimensions.Icon.small)
+                                }
+                                Text(
+                                    text = categoryLabel(split.category),
+                                    style = PennyWiseText.metadata,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (split.amount > BigDecimal.ZERO) {
+                                Text(
+                                    text = CurrencyFormatter.signed(amountPrefix, CurrencyFormatter.formatCurrency(split.amount, transaction.currency)),
+                                    style = PennyWiseText.amountSmall,
+                                    color = amountColor,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                        thickness = 0.5.dp
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                onClick()
+                            }
+                            .padding(vertical = Spacing.xs, horizontal = Spacing.xxs),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.txn_item_view_details),
+                            style = PennyWiseText.metadata,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        } else null
     )
 }
 

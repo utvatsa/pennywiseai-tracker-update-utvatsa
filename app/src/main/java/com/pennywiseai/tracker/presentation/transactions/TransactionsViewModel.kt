@@ -10,6 +10,7 @@ import com.pennywiseai.tracker.data.database.entity.CategoryEntity
 import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionGroupEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionSplitEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.expandWithChildren
 import com.pennywiseai.tracker.data.database.entity.parentNameOf
@@ -81,13 +82,10 @@ class TransactionsViewModel @Inject constructor(
         tagRepository.observeTransactionTagNames()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    // transactionId -> ordered split categories for composite badge rendering
-    val transactionSplitsMap: StateFlow<Map<Long, List<String>>> =
+    // transactionId -> ordered splits (category + amount) for inline expansion & composite badge rendering
+    val transactionSplitsMap: StateFlow<Map<Long, List<TransactionSplitEntity>>> =
         transactionRepository.observeSplitsForActiveTransactions()
-            .map { splits ->
-                splits.groupBy { it.transactionId }
-                    .mapValues { (_, list) -> list.map { it.category } }
-            }
+            .map { splits -> splits.groupBy { it.transactionId } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     // raw merchant name -> user-set display alias (#583), so a merchant's alias

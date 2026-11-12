@@ -922,9 +922,15 @@ class HomeViewModel @Inject constructor(
                     val profileId = _uiState.value.selectedProfileId
                     val keys = buildProfileAccountKeys(balances ?: emptyList())
                     val splitsByTxn = allSplits.groupBy { it.transactionId }
-                        .mapValues { (_, list) -> list.map { it.category } }
                     filterTransactionsByProfile(ungrouped, profileId, keys)
-                        .map { HomeRecentItem.SingleTransaction(it, splitCategories = splitsByTxn[it.id] ?: emptyList()) }
+                        .map {
+                            val splits = splitsByTxn[it.id] ?: emptyList()
+                            HomeRecentItem.SingleTransaction(
+                                transaction = it,
+                                splits = splits,
+                                splitCategories = splits.map { s -> s.category }
+                            )
+                        }
                 },
                 combine(
                     rawGroupsFlow,
