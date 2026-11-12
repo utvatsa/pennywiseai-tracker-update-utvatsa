@@ -20,6 +20,9 @@ class TransactionNotificationIconHelperTest {
 
         val uberRes = BrandIcons.getIconResource("Uber")
         assertNotNull(uberRes)
+
+        val zeptoRes = BrandIcons.getIconResource("Zepto")
+        assertNotNull(zeptoRes)
     }
 
     @Test
@@ -27,6 +30,11 @@ class TransactionNotificationIconHelperTest {
         assertEquals("🍽️", CategoryMapping.effectiveEmojiFor("Food & Dining"))
         assertEquals("🛒", CategoryMapping.effectiveEmojiFor("Groceries"))
         assertEquals("🚗", CategoryMapping.effectiveEmojiFor("Transportation"))
+        assertEquals("🏛️", CategoryMapping.effectiveEmojiFor("Tax"))
+        assertEquals("💸", CategoryMapping.effectiveEmojiFor("Bank Charges"))
+        assertEquals("💳", CategoryMapping.effectiveEmojiFor("Credit Card Payment"))
+        assertEquals("💰", CategoryMapping.effectiveEmojiFor("Salary"))
+        assertEquals("💵", CategoryMapping.effectiveEmojiFor("Income"))
         assertEquals("🏷️", CategoryMapping.effectiveEmojiFor("Others"))
     }
 
