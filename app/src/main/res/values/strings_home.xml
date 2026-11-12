@@ -304,6 +304,11 @@
     <string name="notif_txn_unknown_merchant">Unknown</string>
     <string name="notif_txn_unknown_bank">Bank</string>
     <string name="notif_txn_action_more">More…</string>
+    <string name="notif_action_accept">Accept</string>
+    <string name="notif_action_edit">Edit</string>
+    <string name="notif_txn_confirmed">Transaction confirmed</string>
+    <string name="notif_txn_debit">Debit</string>
+    <string name="notif_txn_credit">Credit</string>
     <!-- Lock-screen title of the balance alert; %1$s is the bank name. No figures. -->
     <string name="notif_txn_public_text">%1$s • balance needs a look</string>
     <!-- Alert title, the amount alone; the merchant is the line below. %1$s amount with currency -->

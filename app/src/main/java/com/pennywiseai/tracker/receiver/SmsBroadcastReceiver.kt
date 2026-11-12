@@ -86,6 +86,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         private const val CATEGORY_SLOT_BASE = 10
         private const val PICKER_SLOT = 9
         private const val TRACK_SLOT = 7
+        private const val ACCEPT_SLOT = 4
 
         internal fun categoryRequestCode(transactionId: Long, slotIndex: Int): Int =
             (transactionId * CATEGORY_SLOT_BASE + slotIndex).toInt()
@@ -830,29 +831,59 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             val transactionId = transaction.id
             val pendingIntent = openTransactionIntent(context, transactionId)
 
-            val amount = CurrencyFormatter.formatCurrency(transaction.amount, transaction.currency, maskIfHidden = false)
-            val merchant = context.bidiIsolate(transaction.merchantName.ifBlank { context.getString(R.string.notif_txn_unknown_merchant) })
-            // The amount gets the title to itself and the merchant the line below,
-            // so a long name never cuts the amount off (or the amount the name).
-            val title = when (transaction.transactionType) {
-                TransactionType.INCOME -> context.getString(R.string.notif_txn_title_received, amount)
-                TransactionType.EXPENSE, TransactionType.CREDIT -> context.getString(R.string.notif_txn_title_spent, amount)
-                else -> amount
+            val amountPrefix = when (transaction.transactionType) {
+                TransactionType.INCOME -> "+"
+                TransactionType.EXPENSE, TransactionType.CREDIT, TransactionType.INVESTMENT -> "-"
+                TransactionType.TRANSFER -> ""
             }
-            // From the table: a process started for this SMS may not have mirrored CategoryMapping.userStyles yet.
+            val formattedAmount = CurrencyFormatter.formatCurrency(transaction.amount, transaction.currency, maskIfHidden = false)
+            val signedAmount = CurrencyFormatter.signed(amountPrefix, formattedAmount)
+            val merchant = context.bidiIsolate(transaction.merchantName.ifBlank { context.getString(R.string.notif_txn_unknown_merchant) })
+
+            val typeTag = when (transaction.transactionType) {
+                TransactionType.INCOME -> context.getString(R.string.notif_txn_credit)
+                TransactionType.CREDIT -> context.getString(R.string.notif_txn_credit)
+                TransactionType.EXPENSE -> context.getString(R.string.notif_txn_debit)
+                TransactionType.TRANSFER -> context.getString(R.string.txn_item_tag_transfer)
+                TransactionType.INVESTMENT -> context.getString(R.string.txn_item_tag_investment)
+            }
+
+            // Title: signed amount + merchant name, resembling a transaction item
+            val title = "$signedAmount · $merchant"
+
             val categories = categoryRepository.getAllCategories().first()
-            // Unsorted: ask, with one-tap answers. Sorted: the category sits in the header.
-            val uncategorized = transaction.category == BuiltinCategoryNames.current("Others")
-            // No bank: the user knows which account they paid from. The question
-            // and a price change wait for the expanded view, beside the buttons they explain.
-            val askLine = if (uncategorized) context.getString(R.string.notif_txn_ask_category) else null
-            val expanded = listOfNotNull(merchant, askLine, priceLine).joinToString("\n")
+            val categoryLabel = CategoryMapping.label(context, transaction.category, categories)
+            val bankAccountText = listOfNotNull(
+                transaction.bankName?.takeIf { it.isNotBlank() },
+                transaction.accountNumber?.takeLast(4)?.takeIf { it.isNotBlank() }?.let { "••$it" }
+            ).joinToString(" ")
+            val subtitle = listOfNotNull(
+                categoryLabel.takeIf { it.isNotBlank() && it != "Others" },
+                bankAccountText.takeIf { it.isNotBlank() }
+            ).joinToString(" · ").ifBlank { categoryLabel }
+
+            val expanded = buildList {
+                add(merchant)
+                add("$signedAmount ($typeTag)")
+                if (subtitle.isNotBlank()) add(subtitle)
+                priceLine?.let { add(it) }
+            }.joinToString("\n")
+
+            // Generate circular brand/category avatar
+            val largeIconBitmap = runCatching {
+                TransactionNotificationIconHelper.createCircularIconBitmap(
+                    context = context,
+                    merchantName = transaction.merchantName,
+                    category = transaction.category
+                )
+            }.getOrNull()
 
             val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .apply { largeIconBitmap?.let { setLargeIcon(it) } }
                 .setContentTitle(title)
-                .setContentText(merchant)
-                .setSubText(if (uncategorized) null else CategoryMapping.label(context, transaction.category, categories))
+                .setContentText(subtitle)
+                .setSubText(typeTag)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(expanded))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(pendingIntent)
@@ -872,12 +903,28 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                     )
                 )
 
-            // Notification action slots are precious (Android collapses past 3),
-            // so the last opens the full picker; see [alertLayout] for the rest. (#303)
             val notificationId = transactionId.toInt()
-            // A repeat charge's "Track as … bill", or a repriced bill's "Update price",
-            // goes first. They never both apply: a price change needs a subscription,
-            // and Track needs there to be none.
+
+            // 1. Accept button: confirms and dismisses with a toast feedback
+            notificationBuilder.addAction(
+                0,
+                context.getString(R.string.notif_action_accept),
+                NotificationActionReceiver.confirmIntent(
+                    context,
+                    categoryRequestCode(transactionId, ACCEPT_SLOT),
+                    transactionId,
+                    notificationId
+                )
+            )
+
+            // 2. Edit button: navigates directly to edit/detail screen
+            notificationBuilder.addAction(
+                0,
+                context.getString(R.string.notif_action_edit),
+                pendingIntent
+            )
+
+            // A repeat charge's "Track as … bill", or a repriced bill's "Update price"
             val billAction = offerPriceUpdate || trackCycle != null
             if (billAction) {
                 notificationBuilder.addExtras(android.os.Bundle().apply { putBoolean(EXTRA_BILL_ACTION, true) })
@@ -906,49 +953,6 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                     )
                 )
             }
-            val (pickCount, canExclude) =
-                alertLayout(transaction.transactionType, uncategorized, transaction.excludedFromAnalytics, billAction)
-            if (pickCount > 0) {
-                quickPicksFor(transaction, repository, categoryRepository).take(pickCount).forEachIndexed { index, pick ->
-                    val categoryIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-                        action = NotificationActionReceiver.ACTION_CHANGE_CATEGORY
-                        putExtra(NotificationActionReceiver.EXTRA_TRANSACTION_ID, transactionId)
-                        putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
-                        putExtra(NotificationActionReceiver.EXTRA_NEW_CATEGORY, pick)
-                    }
-                    val categoryPendingIntent = PendingIntent.getBroadcast(
-                        context,
-                        categoryRequestCode(transactionId, index),
-                        categoryIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    notificationBuilder.addAction(0, CategoryMapping.label(context, pick, categories), categoryPendingIntent)
-                }
-            }
-
-            if (canExclude) {
-                notificationBuilder.addAction(
-                    0,
-                    context.getString(
-                        if (transaction.transactionType == TransactionType.INCOME) R.string.notif_txn_action_not_income
-                        else R.string.notif_txn_action_not_expense
-                    ),
-                    NotificationActionReceiver.excludeIntent(
-                        context,
-                        categoryRequestCode(transactionId, EXCLUDE_SLOT),
-                        transactionId,
-                        notificationId,
-                        undo = false
-                    )
-                )
-            }
-
-            // The translucent picker: any category, not just the quick picks.
-            notificationBuilder.addAction(
-                0,
-                context.getString(if (uncategorized) R.string.notif_txn_action_more else R.string.notif_txn_action_change),
-                pickerIntent(context, transactionId, notificationId)
-            )
 
             val notification = notificationBuilder.build()
             notificationManager.notify(notificationId, notification)
