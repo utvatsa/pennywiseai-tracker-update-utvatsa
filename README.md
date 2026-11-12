@@ -60,6 +60,7 @@ Your bank already texts you every transaction — PennyWise turns those SMS into
 - **🌍 Multi-Currency** — Native support for INR, USD, AED, THB, NPR, ETB, and more with exchange rate management
 - **💬 On-Device AI Assistant** — Ask "What did I spend on food?" — powered by Qwen 2.5, runs entirely on your phone
 - **🏷️ Auto-Categorization & Smart Rules** — Pattern-based rules that auto-categorize transactions
+- **✂️ Category Splits & Composite Badges** — Split a transaction across multiple categories with priority reordering, live preview, and combination-cached emoji composite logos
 - **💰 Budget Tracking** — Multiple budget groups (Limit/Target/Expected types), daily allowance, category-level budgets
 - **📊 Analytics & Charts** — Bar charts, line trends, heatmaps, category breakdowns, top merchants, custom date ranges
 - **🏦 Multi-Account & Balance Tracking** — Track multiple bank accounts with live balance from SMS and balance history
