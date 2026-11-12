@@ -71,6 +71,14 @@
     <!-- Breakdown cards -->
     <string name="analytics_spending_by_category">Spending by Category</string>
     <string name="analytics_spending_by_tag">Spending by Tag</string>
+    <plurals name="analytics_subcategories_count">
+        <item quantity="one">%1$d subcategory</item>
+        <item quantity="other">%1$d subcategories</item>
+    </plurals>
+    <string name="analytics_hide_subcategories">Hide</string>
+    <string name="analytics_subcategory_percent_both">%1$d%% of %2$s · %3$d%% total</string>
+    <string name="analytics_direct_spend">Direct spend</string>
+    <string name="analytics_back_to_all_categories">All Categories</string>
 
     <!-- ══ Budgets screen ══ -->
     <string name="budgets_title">Budgets</string>

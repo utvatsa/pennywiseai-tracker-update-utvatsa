@@ -3,49 +3,49 @@ package com.pennywiseai.tracker.presentation.analytics
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.currency.CurrencyConversionService
-import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.BudgetImpactType
+import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.TransactionWithSplits
+import com.pennywiseai.tracker.data.database.entity.expandWithChildren
+import com.pennywiseai.tracker.data.database.entity.parentNameOf
 import com.pennywiseai.tracker.data.preferences.UserPreferencesRepository
 import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.CategoryRepository
 import com.pennywiseai.tracker.data.repository.ProfileRepository
 import com.pennywiseai.tracker.data.repository.TagRepository
 import com.pennywiseai.tracker.data.repository.TransactionRepository
-import com.pennywiseai.tracker.utils.countingTransferPairsOnce
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import com.pennywiseai.tracker.presentation.common.TimePeriod
+import com.pennywiseai.tracker.domain.model.BudgetCycle
 import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
+import com.pennywiseai.tracker.domain.model.buildProfileAccountKeys
+import com.pennywiseai.tracker.domain.model.filterTransactionsByProfile
+import com.pennywiseai.tracker.domain.spending.SpendForecast
 import com.pennywiseai.tracker.domain.spending.analyticsRowsFor
 import com.pennywiseai.tracker.domain.spending.defaultTypeFilter
 import com.pennywiseai.tracker.domain.spending.netOf
 import com.pennywiseai.tracker.domain.spending.refundNetting
 import com.pennywiseai.tracker.presentation.common.AccountOption
+import com.pennywiseai.tracker.presentation.common.TimePeriod
 import com.pennywiseai.tracker.presentation.common.accountOptions
-import com.pennywiseai.tracker.domain.model.buildProfileAccountKeys
-import com.pennywiseai.tracker.domain.model.filterTransactionsByProfile
-import com.pennywiseai.tracker.data.database.entity.expandWithChildren
-import com.pennywiseai.tracker.data.database.entity.parentNameOf
 import com.pennywiseai.tracker.presentation.common.getCycleAwareDateRange
 import com.pennywiseai.tracker.presentation.common.getDateRangeForPeriod
+import com.pennywiseai.tracker.ui.components.BalancePoint
 import com.pennywiseai.tracker.utils.CurrencyUtils
 import com.pennywiseai.tracker.utils.Money
+import com.pennywiseai.tracker.utils.countingTransferPairsOnce
 import com.pennywiseai.tracker.utils.forTotals
-import com.pennywiseai.tracker.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import com.pennywiseai.tracker.domain.model.BudgetCycle
-import com.pennywiseai.tracker.domain.spending.SpendForecast
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
-import com.pennywiseai.tracker.ui.components.BalancePoint
 
 enum class ChartType { LINE, BAR, HEATMAP }
 
@@ -122,14 +122,14 @@ class AnalyticsViewModel @Inject constructor(
     fun selectProfile(id: Long?) {
         viewModelScope.launch { userPreferencesRepository.updateSelectedProfileId(id) }
     }
-    
+
     private val _selectedPeriod = MutableStateFlow(TimePeriod.THIS_MONTH)
     val selectedPeriod: StateFlow<TimePeriod> = _selectedPeriod.asStateFlow()
 
     /** Drives the period chip's date label (#686). */
     val budgetCycleStartDay: StateFlow<Int> = userPreferencesRepository.budgetCycleStartDay
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1)
-    
+
     private val typeFilter = TypeFilterSelection()
     val transactionTypeFilter: StateFlow<TransactionTypeFilter> = typeFilter.value
 
@@ -395,12 +395,17 @@ class AnalyticsViewModel @Inject constructor(
                 // Build category breakdown considering splits
                 val categoryAmounts = mutableMapOf<String, BigDecimal>()
                 val categoryTransactionCounts = mutableMapOf<String, Int>()
+                // Track subcategories under each parent category (#Feature F5)
+                val subCategoryAmounts = mutableMapOf<String, MutableMap<String, BigDecimal>>()
+                val subCategoryTransactionCounts = mutableMapOf<String, MutableMap<String, Int>>()
+                val directParentAmounts = mutableMapOf<String, BigDecimal>()
 
                 for (txWithSplits in categoryFilteredWithSplits) {
                     val fromCurrency = txWithSplits.transaction.currency
                     txWithSplits.getAmountByCategory().forEach { (category, amount) ->
-                        // Sub-categories roll up into their parent row (#374).
-                        val categoryName = category.ifEmpty { "Others" }.let { parentOf[it] ?: it }
+                        val rawCategory = category.ifEmpty { "Others" }
+                        val parentName = parentOf[rawCategory]
+                        val categoryName = parentName ?: rawCategory
                         val converted = if (isUnified) {
                             currencyConversionService.convertAmountOrNull(amount, fromCurrency, displayCurrency)
                                 ?: return@forEach // never-rated pair — skip, don't face-value (#670)
@@ -409,6 +414,15 @@ class AnalyticsViewModel @Inject constructor(
                         }
                         categoryAmounts[categoryName] = (categoryAmounts[categoryName] ?: BigDecimal.ZERO) + converted
                         categoryTransactionCounts[categoryName] = (categoryTransactionCounts[categoryName] ?: 0) + 1
+
+                        if (parentName != null) {
+                            val subAmounts = subCategoryAmounts.getOrPut(categoryName) { mutableMapOf() }
+                            subAmounts[rawCategory] = (subAmounts[rawCategory] ?: BigDecimal.ZERO) + converted
+                            val subCounts = subCategoryTransactionCounts.getOrPut(categoryName) { mutableMapOf() }
+                            subCounts[rawCategory] = (subCounts[rawCategory] ?: 0) + 1
+                        } else {
+                            directParentAmounts[categoryName] = (directParentAmounts[categoryName] ?: BigDecimal.ZERO) + converted
+                        }
                     }
                 }
 
@@ -424,12 +438,45 @@ class AnalyticsViewModel @Inject constructor(
                 refunds.byCategory.forEach { (category, refund) ->
                     categoryAmounts[category] = netOf(categoryAmounts[category] ?: BigDecimal.ZERO, refund)
                 }
+                refunds.bySubCategory.forEach { (subCat, refund) ->
+                    val parent = parentOf[subCat]
+                    if (parent != null) {
+                        val subMap = subCategoryAmounts[parent]
+                        if (subMap != null && subCat in subMap) {
+                            subMap[subCat] = netOf(subMap[subCat] ?: BigDecimal.ZERO, refund)
+                        }
+                    } else {
+                        if (subCat in directParentAmounts) {
+                            directParentAmounts[subCat] = netOf(directParentAmounts[subCat] ?: BigDecimal.ZERO, refund)
+                        }
+                    }
+                }
                 if (filterState.typeFilter.netsRefunds) totalSpending = netOf(totalSpending, refunds.total)
                 // Total refund value netted off the headline total. Used to explain the
                 // gap when the per-category floor leaves the bars summing above the total (#704).
                 val refundNettedTotal = refunds.total
 
                 val categoryBreakdown = categoryAmounts.map { (categoryName, categoryTotal) ->
+                    val subList = subCategoryAmounts[categoryName]?.mapNotNull { (subName, subAmount) ->
+                        if (subAmount <= BigDecimal.ZERO) null
+                        else {
+                            val pctParent = if (categoryTotal > BigDecimal.ZERO) {
+                                (subAmount.divide(categoryTotal, 4, java.math.RoundingMode.HALF_UP) * BigDecimal(100)).toFloat().coerceAtMost(100f)
+                            } else 0f
+                            val pctTotal = if (totalSpending > BigDecimal.ZERO) {
+                                (subAmount.divide(totalSpending, 4, java.math.RoundingMode.HALF_UP) * BigDecimal(100)).toFloat().coerceAtMost(100f)
+                            } else 0f
+                            SubCategoryData(
+                                name = subName,
+                                amount = subAmount,
+                                percentageOfParent = pctParent,
+                                percentageOfTotal = pctTotal,
+                                transactionCount = subCategoryTransactionCounts[categoryName]?.get(subName) ?: 0,
+                                color = categoryColorMap[subName]
+                            )
+                        }
+                    }?.sortedByDescending { it.amount }.orEmpty()
+
                     CategoryData(
                         name = categoryName,
                         amount = categoryTotal,
@@ -440,7 +487,9 @@ class AnalyticsViewModel @Inject constructor(
                             (categoryTotal.divide(totalSpending, 4, java.math.RoundingMode.HALF_UP) * BigDecimal(100)).toFloat().coerceAtMost(100f)
                         } else 0f,
                         transactionCount = categoryTransactionCounts[categoryName] ?: 0,
-                        color = categoryColorMap[categoryName]
+                        color = categoryColorMap[categoryName],
+                        subCategories = subList,
+                        directAmount = directParentAmounts[categoryName] ?: BigDecimal.ZERO
                     )
                 }.sortedByDescending { it.amount }
 
@@ -865,6 +914,15 @@ data class AccountBreakdownData(
     val transactionCount: Int
 )
 
+data class SubCategoryData(
+    val name: String,
+    val amount: BigDecimal,
+    val percentageOfParent: Float,
+    val percentageOfTotal: Float,
+    val transactionCount: Int,
+    val color: String? = null
+)
+
 data class CategoryData(
     val name: String,
     val amount: BigDecimal,
@@ -872,7 +930,9 @@ data class CategoryData(
     val transactionCount: Int,
     // Hex color (e.g. "#4CAF50") of the user's category, when known. Null falls
     // back to the built-in CategoryMapping palette, then gray (#586).
-    val color: String? = null
+    val color: String? = null,
+    val subCategories: List<SubCategoryData> = emptyList(),
+    val directAmount: BigDecimal = BigDecimal.ZERO
 )
 
 data class TagData(
@@ -890,4 +950,3 @@ data class MerchantData(
     val transactionCount: Int,
     val isSubscription: Boolean
 )
-
