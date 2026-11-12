@@ -1,4 +1,4 @@
-• Priority-allocated category splits: divided transactions now feature composite emoji badges displaying primary and secondary categories.
-• Reorder split priority: adjust category order in split editor with live preview; changes update the transaction badge instantly.
-• Combination-cached logos: efficient icon cache across transactions sharing category combinations.
-• Category customization: built-in emojis for default categories and required emoji selection for new custom categories.
+• Zero-base category split allocation: start split with full amount on primary category and second category initialized to zero.
+• Fill with remaining button: 1-tap allocate unallocated balance into any zero-amount category.
+• Quick clear: trailing clear button on amount field resets amount to zero with 1 tap.
+• Improved validation: clear state guidance when categories require allocation.
