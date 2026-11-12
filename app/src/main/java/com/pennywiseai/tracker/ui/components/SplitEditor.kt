@@ -1,13 +1,13 @@
 package com.pennywiseai.tracker.ui.components
 
-import com.pennywiseai.tracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
@@ -17,16 +17,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pennywiseai.tracker.R
+import com.pennywiseai.tracker.ui.icons.CategoryMapping
+import com.pennywiseai.tracker.ui.icons.SplitIconCache
+import com.pennywiseai.tracker.ui.icons.categoryLabel
 import com.pennywiseai.tracker.ui.theme.Dimensions
-import com.pennywiseai.tracker.ui.theme.Spacing
 import com.pennywiseai.tracker.ui.theme.PennyWiseText
+import com.pennywiseai.tracker.ui.theme.Spacing
 import com.pennywiseai.tracker.utils.CurrencyFormatter
 import java.math.BigDecimal
-import com.pennywiseai.tracker.ui.icons.categoryLabel
 
 data class SplitItem(
     val id: Long = 0,
@@ -60,17 +64,29 @@ fun SplitEditor(
             modifier = Modifier.padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            // Header
+            // Header with live composite icon preview
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = stringResource(R.string.split_editor_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    if (splits.size >= 2) {
+                        SplitCategoryIcon(
+                            categories = splits.map { it.category },
+                            size = 36.dp,
+                            showBackground = true
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.split_editor_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
                 TextButton(
                     onClick = onRemoveSplits,
@@ -87,8 +103,29 @@ fun SplitEditor(
             splits.forEachIndexed { index, split ->
                 SplitRow(
                     split = split,
+                    priorityIndex = index,
                     availableCategories = availableCategories.filter { cat ->
                         cat == split.category || splits.none { it.category == cat }
+                    },
+                    canMoveUp = index > 0,
+                    canMoveDown = index < splits.lastIndex,
+                    onMoveUp = {
+                        if (index > 0) {
+                            val newSplits = splits.toMutableList()
+                            val temp = newSplits[index]
+                            newSplits[index] = newSplits[index - 1]
+                            newSplits[index - 1] = temp
+                            onSplitsChanged(newSplits)
+                        }
+                    },
+                    onMoveDown = {
+                        if (index < splits.lastIndex) {
+                            val newSplits = splits.toMutableList()
+                            val temp = newSplits[index]
+                            newSplits[index] = newSplits[index + 1]
+                            newSplits[index + 1] = temp
+                            onSplitsChanged(newSplits)
+                        }
                     },
                     onCategoryChanged = { newCategory ->
                         val newSplits = splits.toMutableList()
@@ -199,7 +236,12 @@ fun SplitEditor(
 @Composable
 private fun SplitRow(
     split: SplitItem,
+    priorityIndex: Int,
     availableCategories: List<String>,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onCategoryChanged: (String) -> Unit,
     onAmountChanged: (BigDecimal) -> Unit,
     onRemove: () -> Unit,
@@ -212,9 +254,7 @@ private fun SplitRow(
         mutableStateOf(if (split.amount == BigDecimal.ZERO) "" else split.amount.stripTrailingZeros().toPlainString())
     }
 
-    // Category on its own full-width line, amount + remove beneath it. Side by
-    // side the dropdown was ~a third of the row, so anything longer than
-    // "Shopping" was clipped mid-word ("Bills & Util") once selected.
+    // Category on its own full-width line, amount + remove beneath it.
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -223,6 +263,59 @@ private fun SplitRow(
             .padding(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
+        // Priority header with reordering buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val priorityLabel = when (priorityIndex) {
+                0 -> stringResource(R.string.split_priority_primary)
+                1 -> stringResource(R.string.split_priority_secondary)
+                2 -> stringResource(R.string.split_priority_tertiary)
+                else -> "${priorityIndex + 1}th"
+            }
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = if (priorityIndex == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Text(
+                    text = priorityLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (priorityIndex == 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.xs, vertical = 2.dp)
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(Dimensions.Component.iconButton),
+                    shapes = IconButtonDefaults.shapes()
+                ) {
+                    Icon(
+                        Icons.Default.ArrowUpward,
+                        contentDescription = stringResource(R.string.split_editor_move_up),
+                        modifier = Modifier.size(Dimensions.Icon.small)
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(Dimensions.Component.iconButton),
+                    shapes = IconButtonDefaults.shapes()
+                ) {
+                    Icon(
+                        Icons.Default.ArrowDownward,
+                        contentDescription = stringResource(R.string.split_editor_move_down),
+                        modifier = Modifier.size(Dimensions.Icon.small)
+                    )
+                }
+            }
+        }
+
         // Category dropdown
         ExposedDropdownMenuBox(
             expanded = expanded,
@@ -353,16 +446,44 @@ fun SplitBreakdownCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            splits.forEach { split ->
+            splits.forEachIndexed { index, split ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = categoryLabel(split.category),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = if (index == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Text(
+                                text = when (index) {
+                                    0 -> "1st"
+                                    1 -> "2nd"
+                                    2 -> "3rd"
+                                    else -> "${index + 1}th"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (index == 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                        CategoryMapping.effectiveEmojiFor(split.category)?.let { emoji ->
+                            Text(
+                                text = emoji,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Text(
+                            text = categoryLabel(split.category),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                     Text(
                         text = CurrencyFormatter.formatCurrency(split.amount, currency),
                         style = MaterialTheme.typography.bodyMedium,

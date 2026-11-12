@@ -334,6 +334,7 @@ internal fun HomeRecentTransactionsList(
                     displayCurrency = if (isUnifiedMode) selectedCurrency else null,
                     showTypeLabel = false,
                     profileAccountKeys = profileAccountKeys,
+                    splitCategories = item.splitCategories,
                     onClick = { onTransactionClick(item.transaction.id) }
                 )
                 is HomeRecentItem.GroupItem -> GroupCard(

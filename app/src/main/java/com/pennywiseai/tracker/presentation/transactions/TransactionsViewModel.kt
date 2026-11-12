@@ -1,41 +1,41 @@
 package com.pennywiseai.tracker.presentation.transactions
 
-import com.pennywiseai.tracker.ui.UiText
-import com.pennywiseai.tracker.R
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pennywiseai.tracker.R
+import com.pennywiseai.tracker.core.Constants
+import com.pennywiseai.tracker.data.currency.CurrencyConversionService
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
+import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionGroupEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.expandWithChildren
 import com.pennywiseai.tracker.data.database.entity.parentNameOf
+import com.pennywiseai.tracker.data.preferences.IgnoredAccountsStore
+import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.CategoryRepository
 import com.pennywiseai.tracker.data.repository.MerchantAliasRepository
-import com.pennywiseai.tracker.data.repository.TagRepository
-import com.pennywiseai.tracker.data.repository.TransactionRepository
-import com.pennywiseai.tracker.presentation.common.TimePeriod
-import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
-import com.pennywiseai.tracker.presentation.common.getCycleAwareDateRange
-import com.pennywiseai.tracker.presentation.common.getDateRangeForPeriod
-import com.pennywiseai.tracker.presentation.common.CurrencyGroupedTotals
-import com.pennywiseai.tracker.presentation.common.AccountOption
-import com.pennywiseai.tracker.presentation.common.accountOptions
-import com.pennywiseai.tracker.domain.model.buildProfileAccountKeys
-import com.pennywiseai.tracker.presentation.common.filterTransactionsByAccount
-import com.pennywiseai.tracker.core.Constants
-import com.pennywiseai.tracker.data.currency.CurrencyConversionService
-import com.pennywiseai.tracker.data.database.entity.ProfileEntity
-import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.ProfileRepository
+import com.pennywiseai.tracker.data.repository.TagRepository
 import com.pennywiseai.tracker.data.repository.TransactionGroupRepository
-import com.pennywiseai.tracker.data.database.entity.TransactionGroupEntity
+import com.pennywiseai.tracker.data.repository.TransactionRepository
+import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
+import com.pennywiseai.tracker.domain.model.buildProfileAccountKeys
 import com.pennywiseai.tracker.domain.usecase.DeleteTransactionUseCase
 import com.pennywiseai.tracker.domain.usecase.RestoreTransactionUseCase
-import com.pennywiseai.tracker.data.preferences.IgnoredAccountsStore
+import com.pennywiseai.tracker.presentation.common.AccountOption
+import com.pennywiseai.tracker.presentation.common.CurrencyGroupedTotals
+import com.pennywiseai.tracker.presentation.common.TimePeriod
+import com.pennywiseai.tracker.presentation.common.accountOptions
+import com.pennywiseai.tracker.presentation.common.filterTransactionsByAccount
+import com.pennywiseai.tracker.presentation.common.getCycleAwareDateRange
+import com.pennywiseai.tracker.presentation.common.getDateRangeForPeriod
+import com.pennywiseai.tracker.ui.UiText
 import com.pennywiseai.tracker.utils.CurrencyUtils
-import com.pennywiseai.tracker.utils.dateQueryWindow
 import com.pennywiseai.tracker.utils.SmsReportUrlBuilder
+import com.pennywiseai.tracker.utils.dateQueryWindow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -81,20 +81,29 @@ class TransactionsViewModel @Inject constructor(
         tagRepository.observeTransactionTagNames()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    // transactionId -> ordered split categories for composite badge rendering
+    val transactionSplitsMap: StateFlow<Map<Long, List<String>>> =
+        transactionRepository.observeSplitsForActiveTransactions()
+            .map { splits ->
+                splits.groupBy { it.transactionId }
+                    .mapValues { (_, list) -> list.map { it.category } }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     // raw merchant name -> user-set display alias (#583), so a merchant's alias
     // is searchable too, not just its raw name (#691).
     private val merchantAliases: StateFlow<Map<String, String>> =
         merchantAliasRepository.getAllAliases()
             .map { list -> list.associate { it.merchantName to it.alias } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-    
+
     private val _selectedPeriod = MutableStateFlow(TimePeriod.THIS_MONTH)
     val selectedPeriod: StateFlow<TimePeriod> = _selectedPeriod.asStateFlow()
 
     /** Drives the period chip's date label (#686). */
     val budgetCycleStartDay: StateFlow<Int> = userPreferencesRepository.budgetCycleStartDay
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1)
-    
+
     private val _categoryFilter = MutableStateFlow<String?>(null)
     val categoryFilter: StateFlow<String?> = _categoryFilter.asStateFlow()
 
@@ -172,7 +181,7 @@ class TransactionsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(TransactionsUiState())
     val uiState: StateFlow<TransactionsUiState> = _uiState.asStateFlow()
-    
+
     private val _currencyGroupedTotals = MutableStateFlow(CurrencyGroupedTotals())
     val currencyGroupedTotals: StateFlow<CurrencyGroupedTotals> = _currencyGroupedTotals.asStateFlow()
 
@@ -356,16 +365,6 @@ class TransactionsViewModel @Inject constructor(
             initialValue = emptyMap()
         )
 
-
-    /**
-     * User-confirmed self-transfer: flip both rows to TRANSFER and populate
-     * their `fromAccount` / `toAccount` so the detail screen can render the
-     * "From → To" account flow (it falls back to `accountNumber` otherwise).
-     * Undo restores the original `transactionType` + `fromAccount` /
-     * `toAccount` for each row. A shared `transferPairId` makes each row one leg
-     * of the transfer (see utils/TransferPairs.kt). Balances stay untouched: the
-     * money moved when the two SMS arrived.
-     */
     /**
      * Link the two currently-selected transactions as a transfer (#614) — the
      * manual counterpart to the auto-detected [suggestedTransferPartnerOf] chip,
@@ -577,7 +576,7 @@ class TransactionsViewModel @Inject constructor(
 
     // Track budget navigation params similarly
     private var appliedBudgetParams: BudgetParams? = null
-    
+
     // Categories flow - will be used to map category names to colors
     val categories: StateFlow<Map<String, CategoryEntity>> = categoryRepository.getAllCategories()
         .map { categoryList ->
@@ -588,7 +587,7 @@ class TransactionsViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyMap()
         )
-    
+
     // Available categories for the current period (before category filter is applied)
     // Used for the category filter chips row
     private val _availableCategories = MutableStateFlow<List<String>>(emptyList())
@@ -664,7 +663,7 @@ class TransactionsViewModel @Inject constructor(
 
         return LocalDate.now().minusMonths(smsScanMonths.value.toLong())
     }
-    
+
     init {
         // Observe selected profile from preferences and cache profile account keys
         viewModelScope.launch {
@@ -909,7 +908,7 @@ class TransactionsViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
     }
-    
+
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
@@ -924,15 +923,15 @@ class TransactionsViewModel @Inject constructor(
     fun selectPeriod(period: TimePeriod) {
         _selectedPeriod.value = period
     }
-    
+
     fun setCategoryFilter(category: String) {
         _categoryFilter.value = category
     }
-    
+
     fun clearCategoryFilter() {
         _categoryFilter.value = null
     }
-    
+
     fun setTransactionTypeFilter(filter: TransactionTypeFilter) {
         _transactionTypeFilter.value = filter
     }
@@ -950,7 +949,7 @@ class TransactionsViewModel @Inject constructor(
     fun clearTagFilter() {
         _tagFilter.value = null
     }
-    
+
     fun setSelectedProfile(profileId: Long?) {
         _selectedProfileId.value = profileId
         viewModelScope.launch {
@@ -1051,7 +1050,7 @@ class TransactionsViewModel @Inject constructor(
             refreshWidgets()
         }
     }
-    
+
     fun clearDeletedTransaction() {
         _deletedTransaction.value = null
     }
@@ -1079,7 +1078,7 @@ class TransactionsViewModel @Inject constructor(
             }
         }
     }
-    
+
     /** A navigated type name, or All when absent, unknown or not listable (Spending). */
     private fun navigatedType(type: String?): TransactionTypeFilter =
         TransactionTypeFilter.entries.firstOrNull { it.name == type && it.inTransactionsList }
@@ -1219,7 +1218,7 @@ class TransactionsViewModel @Inject constructor(
         startDateEpochDay: Long,
         endDateEpochDay: Long,
         currency: String?,
-        categories: String?,  // Comma-separated
+        categories: String?, // Comma-separated
         transactionType: String?
     ) {
         // Create current params to compare
@@ -1365,7 +1364,7 @@ class TransactionsViewModel @Inject constructor(
         } else {
             baseFlow
         }
-        
+
         // Apply transaction type filter
         val typeFilteredFlow = categoriesFilteredFlow.map { filterByType(it, typeFilter) }
 
@@ -1375,7 +1374,7 @@ class TransactionsViewModel @Inject constructor(
             filterBySearch(it, searchQuery, transactionTagsMap.value, merchantAliases.value)
         }
     }
-    
+
     /** The inclusive date-time range [period] covers, or null when it covers all history. */
     private fun periodRange(
         period: TimePeriod,
@@ -1401,7 +1400,6 @@ class TransactionsViewModel @Inject constructor(
     fun getReportUrl(transaction: TransactionEntity): String {
         return SmsReportUrlBuilder.buildUrl(context, transaction.smsBody, transaction.smsSender)
     }
-    
 }
 
 data class TransactionsUiState(
