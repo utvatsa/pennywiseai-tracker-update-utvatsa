@@ -441,6 +441,9 @@
     <string name="split_editor_total">Total:</string>
     <string name="split_editor_remaining">%1$s remaining</string>
     <string name="split_editor_over">%1$s over</string>
+    <string name="split_editor_fill_remaining">Fill with remaining (%1$s)</string>
+    <string name="split_editor_clear_amount">Clear amount</string>
+    <string name="split_editor_zero_amount_warning">All categories need an amount</string>
     <string name="split_editor_remove">Remove split</string>
     <string name="split_editor_move_up">Move up</string>
     <string name="split_editor_move_down">Move down</string>
