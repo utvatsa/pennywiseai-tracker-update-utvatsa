@@ -43,9 +43,9 @@ import androidx.compose.material.icons.filled.SportsMartialArts
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import com.pennywiseai.shared.domain.mapping.SharedCategoryMapping
 import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
@@ -117,7 +117,34 @@ object CategoryMapping {
     fun labelRes(name: String, categories: List<CategoryEntity>): Int? =
         labelRes(name, categories.firstOrNull { it.name == name }?.let { it.builtinKey == it.name })
 
+    private val builtinEmojis = mapOf(
+        "Food & Dining" to "🍽️",
+        "Groceries" to "🛒",
+        "Transportation" to "🚗",
+        "Shopping" to "🛍️",
+        "Bills & Utilities" to "🧾",
+        "Entertainment" to "🎬",
+        "Healthcare" to "🏥",
+        "Investments" to "📈",
+        "Banking" to "🏦",
+        "Personal Care" to "💆",
+        "Education" to "📚",
+        "Mobile" to "📱",
+        "Fitness" to "🏋️",
+        "Insurance" to "🛡️",
+        "Travel" to "✈️",
+        "Salary" to "💰",
+        "Income" to "💵",
+        "Others" to "🏷️"
+    )
+
     fun emojiFor(name: String): String? = userStyles[name]?.emoji?.takeIf { it.isNotBlank() }
+
+    fun defaultEmojiFor(name: String): String? =
+        builtinEmojis[name] ?: userStyles[name]?.builtinKey?.let { builtinEmojis[it] }
+
+    fun effectiveEmojiFor(name: String): String? =
+        emojiFor(name) ?: defaultEmojiFor(name)
 
     /**
      * Resolves the display color for a category. Prefers the user's assigned color
@@ -346,7 +373,7 @@ object IconProvider {
         }
 
         val effectiveCategory = if (category.isValidCategoryOverride()) category!!
-            else CategoryMapping.getCategory(merchantName)
+        else CategoryMapping.getCategory(merchantName)
 
         CategoryMapping.emojiFor(effectiveCategory)?.let {
             return IconResource.Emoji(it, CategoryMapping.colorFor(effectiveCategory))
@@ -358,7 +385,7 @@ object IconProvider {
             icon = categoryInfo.icon,
             // A user category keeps its own color; unknown names fall back to Others'.
             tint = if (effectiveCategory in CategoryMapping.userStyles) CategoryMapping.colorFor(effectiveCategory)
-                else categoryInfo.color
+            else categoryInfo.color
         )
     }
 }

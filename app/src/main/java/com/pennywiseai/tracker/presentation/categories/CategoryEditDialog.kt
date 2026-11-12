@@ -1,7 +1,5 @@
 package com.pennywiseai.tracker.presentation.categories
 
-import com.pennywiseai.tracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,18 +16,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
 import com.pennywiseai.tracker.ui.components.CategoryChip
 import com.pennywiseai.tracker.ui.components.ColorSwatchRow
 import com.pennywiseai.tracker.ui.components.EmojiGlyph
 import com.pennywiseai.tracker.ui.components.cards.PennyWiseCardV2
+import com.pennywiseai.tracker.ui.icons.categoryLabel
 import com.pennywiseai.tracker.ui.theme.Dimensions
 import com.pennywiseai.tracker.ui.theme.Spacing
-import com.pennywiseai.tracker.ui.icons.categoryLabel
-
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -50,7 +49,9 @@ fun CategoryEditDialog(
     val parentCandidates = parentOptions.filter { it.parentId == null && it.isIncome == isIncome && it.id != category?.id }
     // A category with children can't itself become a child.
     val hasChildren = category != null && parentOptions.any { it.parentId == category.id }
+    val isNewCategory = category == null
     var nameError by remember { mutableStateOf(false) }
+    var emojiError by remember { mutableStateOf(false) }
     var selectedColor by remember { mutableStateOf(category?.color ?: "#4CAF50") }
     var emoji by remember { mutableStateOf(category?.icon ?: "") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -174,16 +175,26 @@ fun CategoryEditDialog(
                     }
                 }
 
-                // Icon: one emoji from the keyboard's own picker (#760). Empty = default icon.
+                // Icon: one emoji from the keyboard's own picker (#760). Required for new categories.
                 TextField(
                     value = emoji,
-                    onValueChange = { emoji = lastEmoji(it) ?: emoji },
+                    onValueChange = {
+                        emoji = lastEmoji(it) ?: emoji
+                        if (emoji.isNotBlank()) emojiError = false
+                    },
                     label = { Text(stringResource(R.string.category_edit_icon_label), fontWeight = FontWeight.SemiBold) },
                     placeholder = { Text(stringResource(R.string.category_edit_icon_placeholder)) },
+                    isError = emojiError,
+                    supportingText = if (emojiError) {
+                        { Text(stringResource(R.string.category_edit_emoji_required)) }
+                    } else null,
                     singleLine = true,
                     trailingIcon = if (emoji.isNotEmpty()) {
                         {
-                            IconButton(onClick = { emoji = "" }, shapes = IconButtonDefaults.shapes()) {
+                            IconButton(onClick = {
+                                emoji = ""
+                                if (isNewCategory) emojiError = true
+                            }, shapes = IconButtonDefaults.shapes()) {
                                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.category_edit_clear_icon))
                             }
                         }
@@ -236,8 +247,7 @@ fun CategoryEditDialog(
                                 .size(Dimensions.Icon.medium)
                                 .clip(CircleShape)
                                 .background(
-                                    try { Color(android.graphics.Color.parseColor(selectedColor)) }
-                                    catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                                    try { Color(android.graphics.Color.parseColor(selectedColor)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -264,14 +274,16 @@ fun CategoryEditDialog(
                     }
                     Button(
                         onClick = {
-                            if (name.isNotBlank()) {
+                            val nameValid = name.isNotBlank()
+                            val emojiValid = !isNewCategory || emoji.isNotBlank()
+                            if (!nameValid) nameError = true
+                            if (!emojiValid) emojiError = true
+                            if (nameValid && emojiValid) {
                                 onSave(name.trim(), selectedColor, isIncome, emoji.ifBlank { null }, parentId)
-                            } else {
-                                nameError = true
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank(),
+                        enabled = name.isNotBlank() && (!isNewCategory || emoji.isNotBlank()),
                         shapes = ButtonDefaults.shapes()
                     ) {
                         Text(stringResource(if (category == null) R.string.category_edit_add else R.string.category_edit_save))

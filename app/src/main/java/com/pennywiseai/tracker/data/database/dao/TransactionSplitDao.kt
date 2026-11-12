@@ -27,6 +27,7 @@ interface TransactionSplitDao {
         SELECT s.* FROM transaction_splits s
         INNER JOIN transactions t ON t.id = s.transaction_id
         WHERE t.is_deleted = 0
+        ORDER BY s.id ASC
     """)
     fun observeSplitsForActiveTransactions(): Flow<List<TransactionSplitEntity>>
 
@@ -102,4 +103,12 @@ interface TransactionSplitDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM transaction_splits WHERE transaction_id = :transactionId LIMIT 1)")
     suspend fun hasSplits(transactionId: Long): Boolean
+
+    @Transaction
+    suspend fun replaceSplits(transactionId: Long, splits: List<TransactionSplitEntity>) {
+        deleteSplitsForTransaction(transactionId)
+        if (splits.isNotEmpty()) {
+            insertSplits(splits)
+        }
+    }
 }

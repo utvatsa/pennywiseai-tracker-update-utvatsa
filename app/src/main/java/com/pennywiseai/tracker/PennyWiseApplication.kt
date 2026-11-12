@@ -186,6 +186,7 @@ class PennyWiseApplication : Application(), Configuration.Provider {
                 }
                 CategoryMapping.userStyles.keys.retainAll(styles.keys)
                 CategoryMapping.userStyles.putAll(styles)
+                com.pennywiseai.tracker.ui.icons.SplitIconCache.invalidateAll()
             }
         }
     }

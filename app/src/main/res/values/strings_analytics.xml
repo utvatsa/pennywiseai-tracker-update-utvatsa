@@ -224,8 +224,9 @@
     <string name="category_edit_type_income">Income</string>
     <string name="category_edit_parent_label">Parent category (optional)</string>
     <string name="category_edit_parent_none">None</string>
-    <string name="category_edit_icon_label">Icon (emoji, optional)</string>
+    <string name="category_edit_icon_label">Icon (emoji)</string>
     <string name="category_edit_icon_placeholder">Tap to pick an emoji</string>
+    <string name="category_edit_emoji_required">Emoji is required for new categories</string>
     <string name="category_edit_clear_icon">Clear icon</string>
     <string name="category_edit_color">Color</string>
     <string name="category_edit_preview">Preview</string>

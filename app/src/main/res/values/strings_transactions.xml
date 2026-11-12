@@ -442,7 +442,13 @@
     <string name="split_editor_remaining">%1$s remaining</string>
     <string name="split_editor_over">%1$s over</string>
     <string name="split_editor_remove">Remove split</string>
+    <string name="split_editor_move_up">Move up</string>
+    <string name="split_editor_move_down">Move down</string>
+    <string name="split_priority_primary">1st (Primary)</string>
+    <string name="split_priority_secondary">2nd</string>
+    <string name="split_priority_tertiary">3rd</string>
     <string name="split_breakdown_title">Category Breakdown</string>
+    <string name="txn_detail_menu_refresh_icon">Refresh Icon</string>
     <string name="tag_input_label">Tags (Optional)</string>
     <string name="tag_input_remove">Remove %1$s</string>
     <string name="tag_input_add">Add tag</string>

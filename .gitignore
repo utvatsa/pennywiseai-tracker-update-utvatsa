@@ -18,6 +18,7 @@ local.properties
 # Testing scripts and logs
 crash_log.txt
 test_results.txt
+local_work_notes_antigravity/
 
 # Kotlin/JVM specific
 *.class
