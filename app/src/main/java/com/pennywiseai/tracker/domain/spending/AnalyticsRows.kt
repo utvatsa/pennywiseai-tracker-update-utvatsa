@@ -41,6 +41,7 @@ internal fun netOf(gross: BigDecimal, refund: BigDecimal?): BigDecimal =
 internal class RefundNetting(
     val total: BigDecimal = BigDecimal.ZERO,
     val byCategory: Map<String, BigDecimal> = emptyMap(),
+    val bySubCategory: Map<String, BigDecimal> = emptyMap(),
     /** Keyed "bankName_accountNumber". */
     val byAccount: Map<String, BigDecimal> = emptyMap(),
     val byMerchant: Map<String, BigDecimal> = emptyMap(),
@@ -82,6 +83,7 @@ internal suspend fun refundNetting(
     if (!filter.netsRefunds) return RefundNetting()
     var total = BigDecimal.ZERO
     val byCategory = mutableMapOf<String, BigDecimal>()
+    val bySubCategory = mutableMapOf<String, BigDecimal>()
     val byAccount = mutableMapOf<String, BigDecimal>()
     val byMerchant = mutableMapOf<String, BigDecimal>()
     val byDay = mutableMapOf<LocalDate, BigDecimal>()
@@ -95,9 +97,10 @@ internal suspend fun refundNetting(
         if (amount <= BigDecimal.ZERO) continue
         total += amount
         byCategory.add(parentOf[rawCategory] ?: rawCategory, amount)
+        bySubCategory.add(rawCategory, amount)
         byAccount.add("${tx.bankName}_${tx.accountNumber}", amount)
         byMerchant.add(tx.merchantName, amount)
         byDay.add(tx.dateTime.toLocalDate(), amount)
     }
-    return RefundNetting(total, byCategory, byAccount, byMerchant, byDay)
+    return RefundNetting(total, byCategory, bySubCategory, byAccount, byMerchant, byDay)
 }
