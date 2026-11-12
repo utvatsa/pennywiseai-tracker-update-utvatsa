@@ -126,6 +126,7 @@ class UserPreferencesStorageGoldenTest {
         // Notifications.
         assertFalse(DAILY_SUMMARY_DEFAULT)
         assertFalse(repository.dailySummaryEnabled.first())
+        assertTrue(repository.transactionNotificationsEnabled.first())
         assertFalse(repository.weeklySummaryEnabled.first())
         assertNull(repository.weeklySummaryLastWeek.first())
         assertFalse(repository.budgetAlertsEnabled.first())
@@ -243,6 +244,7 @@ class UserPreferencesStorageGoldenTest {
             it[string("weekly_summary_last_week")] = "2026-01-05"
             it[bool("budget_alerts_enabled")] = true
             it[bool("conscience_enabled")] = true
+            it[bool("transaction_notifications_enabled")] = false
 
             it[bool("balance_hidden")] = false
             it[bool("shake_to_hide_amounts")] = true
@@ -344,6 +346,7 @@ class UserPreferencesStorageGoldenTest {
         assertEquals("2026-01-05", repository.weeklySummaryLastWeek.first())
         assertTrue(repository.budgetAlertsEnabled.first())
         assertTrue(repository.conscienceEnabled.first())
+        assertFalse(repository.transactionNotificationsEnabled.first())
 
         assertFalse(repository.isBalanceHidden.first())
         assertFalse(repository.isAmountHiddenEverywhere.first())
@@ -511,6 +514,8 @@ class UserPreferencesStorageGoldenTest {
 
         repository.setDailySummaryEnabled(true)
         assertEquals(true, stored()[bool("daily_summary_enabled")])
+        repository.setTransactionNotificationsEnabled(false)
+        assertEquals(false, stored()[bool("transaction_notifications_enabled")])
         repository.setWeeklySummaryEnabled(true)
         assertEquals(true, stored()[bool("weekly_summary_enabled")])
         repository.setWeeklySummaryLastWeek("2026-02-02")

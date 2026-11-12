@@ -68,6 +68,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         fun taughtMessageBooker(): com.pennywiseai.tracker.data.manager.TaughtMessageBooker
         fun recurringSuggestionPreferences(): com.pennywiseai.tracker.data.preferences.RecurringSuggestionPreferences
         fun conscienceManager(): ConscienceManager
+        fun notificationPreferences(): com.pennywiseai.tracker.data.preferences.NotificationPreferences
     }
 
     companion object {
@@ -826,6 +827,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         trackCycle: String? = null,
         offerPriceUpdate: Boolean = false
     ): Boolean {
+        if (!canShowTransactionAlerts(context)) return false
         try {
             val notificationManager = ensureChannel(context)
             val transactionId = transaction.id
@@ -964,10 +966,18 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
-    /** Whether a transaction alert would be seen: the app's notifications and its alert channel are on. */
-    private fun canShowTransactionAlerts(context: Context): Boolean {
+    /**
+     * Whether a transaction alert would be seen: the app's notifications and its alert channel are on,
+     * and the in-app setting is enabled.
+     */
+    private suspend fun canShowTransactionAlerts(context: Context): Boolean {
         if (!androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
         val channel = ensureChannel(context).getNotificationChannel(CHANNEL_ID)
-        return channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+        if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) return false
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SmsBroadcastReceiverEntryPoint::class.java
+        )
+        return entryPoint.notificationPreferences().transactionNotificationsEnabled.first()
     }
 }

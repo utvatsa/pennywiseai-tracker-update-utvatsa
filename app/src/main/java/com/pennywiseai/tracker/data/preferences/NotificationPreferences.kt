@@ -16,6 +16,11 @@ interface NotificationPreferences {
 
     suspend fun setDailySummaryEnabled(enabled: Boolean)
 
+    /** Whether an alert is posted when a new transaction is detected from SMS. */
+    val transactionNotificationsEnabled: Flow<Boolean>
+
+    suspend fun setTransactionNotificationsEnabled(enabled: Boolean)
+
     val weeklySummaryEnabled: Flow<Boolean>
 
     suspend fun setWeeklySummaryEnabled(enabled: Boolean)

@@ -232,6 +232,9 @@
     <string name="settings_tracked_apps_enable_access">Turn on notification access first</string>
     <string name="settings_tracked_apps_search">Search apps</string>
     <string name="settings_tracked_apps_done">Done</string>
+    <string name="settings_transaction_notifications_title">New entry alerts</string>
+    <string name="settings_transaction_notifications_subtitle">Show a notification when a new transaction is detected from SMS</string>
+    <string name="settings_transaction_notifications_needs_permission">Allow notifications for PennyWise to get new entry alerts.</string>
     <string name="settings_daily_summary_title">Daily summary</string>
     <string name="settings_daily_summary_subtitle">A recap of today\'s spending at 9\u00A0PM</string>
     <string name="settings_daily_summary_needs_permission">Allow notifications for PennyWise to get the daily summary.</string>
