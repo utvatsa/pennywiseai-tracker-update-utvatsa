@@ -1,10 +1,10 @@
-import org.junit.Test
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import com.pennywiseai.tracker.ui.icons.IconProvider
 import com.pennywiseai.tracker.ui.icons.IconResource
+import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CategoryMappingTest {
 
@@ -23,7 +23,6 @@ class CategoryMappingTest {
         assertEquals("Food & Dining", getCategory("GHL*JHAROKA BY INDUS BANGKOK  11 TH"))
         assertEquals("Food & Dining", getCategory("GHLJHAROKA BY INDUS BANGKOK  11 TH"))
         assertEquals("Food & Dining", getCategory("Ksher  *AKARASKYROOFTOBangkok TH"))
-
 
         assertEquals("Groceries", getCategory("7-11"))
 
@@ -54,7 +53,6 @@ class CategoryMappingTest {
         assertEquals("Travel", getCategory("WESTIN KL-FRONT OFFICE KUALA LUMPUR MY MY"))
         assertEquals("Travel", getCategory("WWW.MAGNOLIASSERVICEDRBANGKOK TH"))
         assertEquals("Travel", getCategory("FOUR POINTS BY SHERATOBANGKOK 11 TH"))
-
 
         assertEquals("Healthcare", getCategory("Life Pharm"))
         assertEquals("Healthcare", getCategory("Bumrungrad"))
@@ -87,44 +85,40 @@ class CategoryMappingTest {
 
     @Test
     fun testGetTransactionIcon_noCategory_derivesFromMerchant() {
-        // null category → derive from merchant name (Food & Dining)
+        // null category → derive from merchant name (Food & Dining) -> Emoji("🍽️")
         val result = IconProvider.getTransactionIcon("Piri Piri Flaming Grill", null)
-        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
-            ?: throw AssertionError("Expected VectorIcon but got $result")
-        val foodInfo = CategoryMapping.categories["Food & Dining"]!!
-        assertEquals(foodInfo.icon, iconResult.icon)
-        assertEquals(foodInfo.color, iconResult.tint)
+        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
+            ?: throw AssertionError("Expected Emoji but got $result")
+        assertEquals("🍽️", emojiResult.emoji)
+        assertEquals(CategoryMapping.colorFor("Food & Dining"), emojiResult.tint)
     }
 
     @Test
     fun testGetTransactionIcon_withCategory_usesGivenCategory() {
-        // "7-11" derives as "Groceries", but override forces "Transportation"
+        // "7-11" derives as "Groceries", but override forces "Transportation" -> Emoji("🚗")
         val result = IconProvider.getTransactionIcon("7-11", "Transportation")
-        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
-            ?: throw AssertionError("Expected VectorIcon but got $result")
-        val transportInfo = CategoryMapping.categories["Transportation"]!!
-        assertEquals(transportInfo.icon, iconResult.icon)
-        assertEquals(transportInfo.color, iconResult.tint)
+        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
+            ?: throw AssertionError("Expected Emoji but got $result")
+        assertEquals("🚗", emojiResult.emoji)
+        assertEquals(CategoryMapping.colorFor("Transportation"), emojiResult.tint)
     }
 
     @Test
     fun testGetTransactionIcon_emptyCategory_fallsBackToDerived() {
-        // Empty string → derive from merchant name
+        // Empty string → derive from merchant name -> Emoji("🍽️")
         val result = IconProvider.getTransactionIcon("Piri Piri Flaming Grill", "")
-        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
-            ?: throw AssertionError("Expected VectorIcon but got $result")
-        val foodInfo = CategoryMapping.categories["Food & Dining"]!!
-        assertEquals(foodInfo.icon, iconResult.icon)
+        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
+            ?: throw AssertionError("Expected Emoji but got $result")
+        assertEquals("🍽️", emojiResult.emoji)
     }
 
     @Test
     fun testGetTransactionIcon_uncategorized_fallsBackToDerived() {
-        // "Uncategorized" → derive from merchant name
+        // "Uncategorized" → derive from merchant name -> Emoji("🍽️")
         val result = IconProvider.getTransactionIcon("Piri Piri Flaming Grill", "Uncategorized")
-        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
-            ?: throw AssertionError("Expected VectorIcon but got $result")
-        val foodInfo = CategoryMapping.categories["Food & Dining"]!!
-        assertEquals(foodInfo.icon, iconResult.icon)
+        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
+            ?: throw AssertionError("Expected Emoji but got $result")
+        assertEquals("🍽️", emojiResult.emoji)
     }
 
     @Test
@@ -148,11 +142,10 @@ class CategoryMappingTest {
     @Test
     fun testGetTransactionIcon_overrideToOthers_usesOthers() {
         val result = IconProvider.getTransactionIcon("Piri Piri Flaming Grill", "Others")
-        val iconResult: IconResource.VectorIcon = result as? IconResource.VectorIcon
-            ?: throw AssertionError("Expected VectorIcon but got $result")
-        val othersInfo = CategoryMapping.categories["Others"]!!
-        assertEquals(othersInfo.icon, iconResult.icon)
-        assertEquals(othersInfo.color, iconResult.tint)
+        val emojiResult: IconResource.Emoji = result as? IconResource.Emoji
+            ?: throw AssertionError("Expected Emoji but got $result")
+        assertEquals("🏷️", emojiResult.emoji)
+        assertEquals(CategoryMapping.colorFor("Others"), emojiResult.tint)
     }
 
     // #760: a user category with an emoji renders that emoji; without one it
@@ -165,11 +158,11 @@ class CategoryMappingTest {
 
             val emoji = IconProvider.getTransactionIcon("Unknown Shop", "Pets")
             assertTrue(emoji is IconResource.Emoji, "Expected Emoji but got $emoji")
-            assertEquals("\uD83D\uDC36", (emoji as IconResource.Emoji).emoji)
+            assertEquals("\uD83D\uDC36", emoji.emoji)
 
-            // An explicit emoji category outranks a recognised brand logo.
+            // Brand logo outranks an explicit emoji category.
             val branded = IconProvider.getTransactionIcon("Starbucks", "Pets")
-            assertTrue(branded is IconResource.Emoji, "Expected Emoji over brand logo but got $branded")
+            assertTrue(branded is IconResource.DrawableResource, "Expected DrawableResource over emoji category but got $branded")
             assertTrue(IconProvider.getTransactionIcon("Starbucks", null) is IconResource.DrawableResource)
 
             val vector = IconProvider.getTransactionIcon("Unknown Shop", "Plants") as IconResource.VectorIcon
@@ -203,6 +196,55 @@ class CategoryMappingTest {
         }
     }
 
+    @Test
+    fun testAllBuiltinCategoriesHaveEmojis() {
+        val builtins = listOf(
+            "Food & Dining" to "🍽️",
+            "Groceries" to "🛒",
+            "Transportation" to "🚗",
+            "Shopping" to "🛍️",
+            "Bills & Utilities" to "🧾",
+            "Entertainment" to "🎬",
+            "Healthcare" to "🏥",
+            "Investments" to "📈",
+            "Banking" to "🏦",
+            "Personal Care" to "💆",
+            "Education" to "📚",
+            "Mobile" to "📱",
+            "Fitness" to "🏋️",
+            "Insurance" to "🛡️",
+            "Travel" to "✈️",
+            "Salary" to "💰",
+            "Income" to "💵",
+            "Tax" to "🏛️",
+            "Bank Charges" to "💸",
+            "Credit Card Payment" to "💳",
+            "Others" to "🏷️"
+        )
+        for ((name, expectedEmoji) in builtins) {
+            assertEquals(expectedEmoji, CategoryMapping.effectiveEmojiFor(name), "Missing or wrong emoji for $name")
+        }
+    }
+
+    @Test
+    fun testGetTransactionIcon_zeptoBrandLogoTakesPriorityOverCategory() {
+        val result = IconProvider.getTransactionIcon("Zepto", "Cigarettes")
+        assertTrue(result is IconResource.DrawableResource, "Zepto must return DrawableResource even with Cigarettes category")
+    }
+
+    @Test
+    fun testGetTransactionIcon_transactionTypeFallback() {
+        val incomeResult = IconProvider.getTransactionIcon(
+            "Unknown Payer",
+            null,
+            com.pennywiseai.tracker.data.database.entity.TransactionType.INCOME
+        )
+        assertTrue(
+            incomeResult is IconResource.Emoji || incomeResult is IconResource.VectorIcon,
+            "Expected Emoji or VectorIcon for INCOME type"
+        )
+    }
+
     // Background callers decide from loaded rows, so an unmirrored userStyles can't mistranslate.
     @Test
     fun testLabelRes_fromRows() {
@@ -217,7 +259,6 @@ class CategoryMappingTest {
         assertEquals(com.pennywiseai.tracker.R.string.category_tax, CategoryMapping.labelRes("Tax", rows)) // no row, still auto-assigned
         assertEquals(null, CategoryMapping.labelRes("Pets", rows))
     }
-
 }
 
 // Helper function to test categorization

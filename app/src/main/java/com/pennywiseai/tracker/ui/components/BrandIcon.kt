@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.ui.icons.BrandIcons
 import com.pennywiseai.tracker.ui.icons.CategoryMapping
 import com.pennywiseai.tracker.ui.icons.IconProvider
@@ -31,7 +32,12 @@ import com.pennywiseai.tracker.ui.icons.categoryLabel
 import com.pennywiseai.tracker.ui.icons.isValidCategoryOverride
 
 /**
- * Displays a brand icon with intelligent fallback
+ * Displays a brand icon with intelligent fallback following the 5-stage logo selector hierarchy:
+ * 1. Brand First: Known merchant brand logos always outrank category icons/emojis/splits.
+ * 2. Multi-Emoji Split Second: Composite multi-emoji badge when 2+ split categories exist.
+ * 3. Single Emoji for Category Third: Custom emoji or clean standard builtin category emoji.
+ * 4. Default for Transaction Type Fourth: e.g. Income.
+ * 5. Default Fallback Fifth: Category vector icon or letter avatar.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -40,16 +46,44 @@ fun BrandIcon(
     category: String? = null,
     splitCategories: List<String> = emptyList(),
     transactionId: Long? = null,
+    transactionType: TransactionType? = null,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     showBackground: Boolean = true
 ) {
-    val iconResource = IconProvider.getTransactionIcon(merchantName, category)
+    // Stage 1: Brand First
+    val brandResId = BrandIcons.getIconResource(merchantName)
+    if (brandResId != null) {
+        val brandColor = BrandIcons.getBrandColor(merchantName)
+        val backgroundColor = brandColor?.let { Color(it.toColorInt()) }
+            ?: MaterialTheme.colorScheme.surfaceVariant
 
-    // Preserve original logo selector hierarchy: brand icon outranks category icon/emoji.
-    // Only when resolution reaches category (i.e. no brand icon drawable matched),
-    // introduce the composite split category icon if 2+ split categories are present.
-    if (iconResource !is IconResource.DrawableResource && splitCategories.size >= 2) {
+        Box(
+            modifier = modifier
+                .size(size)
+                .then(
+                    if (showBackground) {
+                        Modifier
+                            .clip(MaterialShapes.Cookie9Sided.toShape())
+                            .background(backgroundColor)
+                            .padding(if (size < 32.dp) 4.dp else 8.dp)
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = brandResId),
+                contentDescription = merchantName,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        return
+    }
+
+    // Stage 2: Multi-Emoji Split Second
+    if (splitCategories.size >= 2) {
         SplitCategoryIcon(
             categories = splitCategories,
             transactionId = transactionId,
@@ -60,18 +94,13 @@ fun BrandIcon(
         return
     }
 
-    val backgroundColor = if (category.isValidCategoryOverride() &&
-        iconResource !is IconResource.DrawableResource
-    ) {
-        when (iconResource) {
-            is IconResource.VectorIcon -> iconResource.tint
-            is IconResource.Emoji -> iconResource.tint
-            is IconResource.DrawableResource -> MaterialTheme.colorScheme.surfaceVariant
-        }
-    } else {
-        val brandColor = BrandIcons.getBrandColor(merchantName)
-        brandColor?.let { Color(it.toColorInt()) }
-            ?: MaterialTheme.colorScheme.surfaceVariant
+    // Stages 3, 4, 5: Single emoji, transaction type default, or fallback
+    val iconResource = IconProvider.getTransactionIcon(merchantName, category, transactionType)
+
+    val backgroundColor = when (iconResource) {
+        is IconResource.VectorIcon -> iconResource.tint
+        is IconResource.Emoji -> iconResource.tint
+        is IconResource.DrawableResource -> MaterialTheme.colorScheme.surfaceVariant
     }
 
     Box(
@@ -82,7 +111,7 @@ fun BrandIcon(
                     Modifier
                         .clip(MaterialShapes.Cookie9Sided.toShape())
                         .background(backgroundColor)
-                        .padding(8.dp)
+                        .padding(if (size < 32.dp) 4.dp else 8.dp)
                 } else {
                     Modifier
                 }
@@ -153,7 +182,7 @@ fun CategoryIcon(
     size: Dp = 24.dp,
     tint: Color? = null
 ) {
-    CategoryMapping.emojiFor(category)?.let { emoji ->
+    CategoryMapping.effectiveEmojiFor(category)?.let { emoji ->
         Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
             EmojiGlyph(emoji, size * 0.8f)
         }

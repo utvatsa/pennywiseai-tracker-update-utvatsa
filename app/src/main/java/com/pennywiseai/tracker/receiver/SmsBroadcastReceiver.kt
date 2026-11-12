@@ -876,7 +876,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 TransactionNotificationIconHelper.createCircularIconBitmap(
                     context = context,
                     merchantName = transaction.merchantName,
-                    category = transaction.category
+                    category = transaction.category,
+                    transactionType = transaction.transactionType
                 )
             }.getOrNull()
 

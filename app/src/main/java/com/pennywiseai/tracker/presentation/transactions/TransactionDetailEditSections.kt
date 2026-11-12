@@ -88,6 +88,7 @@ internal fun EditableTransactionHeader(
                 category = transaction.category,
                 splitCategories = splitCategories,
                 transactionId = transaction.id,
+                transactionType = transaction.transactionType,
                 size = Dimensions.Icon.hero,
                 showBackground = true
             )
@@ -134,6 +135,7 @@ internal fun EditableTransactionHeader(
                         category = transaction.category,
                         splitCategories = splitCategories,
                         transactionId = transaction.id,
+                        transactionType = transaction.transactionType,
                         size = Dimensions.Icon.small,
                         showBackground = true
                     )

@@ -49,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import com.pennywiseai.shared.domain.mapping.SharedCategoryMapping
 import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.CategoryEntity
+import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.builtinKey
 
 /**
@@ -135,6 +136,9 @@ object CategoryMapping {
         "Travel" to "✈️",
         "Salary" to "💰",
         "Income" to "💵",
+        "Tax" to "🏛️",
+        "Bank Charges" to "💸",
+        "Credit Card Payment" to "💳",
         "Others" to "🏷️"
     )
 
@@ -335,7 +339,7 @@ object IconProvider {
         }
 
         val category = CategoryMapping.getCategory(merchantName)
-        CategoryMapping.emojiFor(category)?.let { return IconResource.Emoji(it, CategoryMapping.colorFor(category)) }
+        CategoryMapping.effectiveEmojiFor(category)?.let { return IconResource.Emoji(it, CategoryMapping.colorFor(category)) }
         val categoryInfo = CategoryMapping.categories[category]
             ?: CategoryMapping.categories["Others"]!!
 
@@ -355,29 +359,56 @@ object IconProvider {
     }
 
     /**
-     * Get icon for a transaction, using an explicitly set category when available.
-     * 1. Try brand-specific icon
-     * 2. If not found, use provided category (if valid)
-     * 3. Otherwise, derive category from merchant name
-     * 4. If still not found, use default icon
+     * Get icon for a transaction, following the 5-stage logo selector hierarchy:
+     * 1. Brand First (known merchant brand logos always outrank category icons/emojis)
+     * 2. (Split categories handled by caller / BrandIcon)
+     * 3. Single emoji for category (custom emoji or clean standard builtin emoji)
+     * 4. Default for transaction type (e.g. Income)
+     * 5. Default fallback icon
      */
-    fun getTransactionIcon(merchantName: String, category: String?): IconResource {
-        // A user's explicit category emoji outranks the auto-detected brand logo (#760).
-        if (category.isValidCategoryOverride()) {
-            CategoryMapping.emojiFor(category!!)?.let {
-                return IconResource.Emoji(it, CategoryMapping.colorFor(category))
-            }
-        }
+    @JvmOverloads
+    fun getTransactionIcon(
+        merchantName: String,
+        category: String?,
+        transactionType: TransactionType? = null
+    ): IconResource {
+        // Stage 1: Brand First - Known brands always show their official brand logo
         BrandIcons.getIconResource(merchantName)?.let { iconRes ->
             return IconResource.DrawableResource(iconRes)
         }
 
+        // Stage 3: Single Emoji for Category
         val effectiveCategory = if (category.isValidCategoryOverride()) category!!
         else CategoryMapping.getCategory(merchantName)
 
-        CategoryMapping.emojiFor(effectiveCategory)?.let {
-            return IconResource.Emoji(it, CategoryMapping.colorFor(effectiveCategory))
+        CategoryMapping.effectiveEmojiFor(effectiveCategory)?.let { emoji ->
+            return IconResource.Emoji(emoji, CategoryMapping.colorFor(effectiveCategory))
         }
+
+        // Stage 4: Default for Transaction Type
+        if (transactionType != null) {
+            when (transactionType) {
+                TransactionType.INCOME -> {
+                    val info = CategoryMapping.categories["Income"] ?: CategoryMapping.categories["Salary"]
+                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
+                }
+                TransactionType.TRANSFER -> {
+                    val info = CategoryMapping.categories["Banking"]
+                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
+                }
+                TransactionType.INVESTMENT -> {
+                    val info = CategoryMapping.categories["Investments"]
+                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
+                }
+                TransactionType.CREDIT -> {
+                    val info = CategoryMapping.categories["Credit Card Payment"]
+                    if (info != null) return IconResource.VectorIcon(info.icon, info.color)
+                }
+                TransactionType.EXPENSE -> {}
+            }
+        }
+
+        // Stage 5: Default Fallback
         val categoryInfo = CategoryMapping.categories[effectiveCategory]
             ?: CategoryMapping.categories["Others"]!!
 
