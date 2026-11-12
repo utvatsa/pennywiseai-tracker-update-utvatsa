@@ -377,7 +377,7 @@ fi
 
 # Build parser-core module first to ensure it compiles
 echo -e "${YELLOW}🔧 Building parser-core module...${NC}"
-if ! ./gradlew :parser-core:build; then
+if ! ./gradlew :parser-core:jvmJar; then
     revert_changes
 fi
 echo -e "${GREEN}✅ Parser-core module built${NC}"
