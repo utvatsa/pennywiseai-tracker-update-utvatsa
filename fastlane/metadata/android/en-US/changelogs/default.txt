@@ -1,4 +1,5 @@
-• New entry alerts: notifications formatted like transaction cards with brand logos, signed amounts, and credit/debit badges.
-• Quick actions: 1-tap [Accept] to confirm transaction with feedback, or [Edit] to open full transaction details.
-• In-app alert control: toggle transaction notifications directly in Settings > Notifications, alongside Android OS controls.
-• Notification permission prompt: automatically requests permission on launch or relaunch if not already granted.
+Version 3.3.0-utvatsa
+
+New Features:
+• 
+
