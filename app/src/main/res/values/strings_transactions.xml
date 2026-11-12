@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="txn_item_tag_split">Split (%1$d)</string>
+    <string name="txn_item_view_details">View / edit details</string>
+
     <!-- Export transactions dialog -->
     <string name="txn_export_title_ready">Export Transactions</string>
     <string name="txn_export_title_exporting">Exporting...</string>

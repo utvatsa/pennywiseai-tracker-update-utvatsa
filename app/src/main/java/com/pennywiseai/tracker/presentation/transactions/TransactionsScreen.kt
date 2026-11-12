@@ -664,6 +664,7 @@ fun TransactionsScreen(
                                         viewModel.toggleSelection(transaction.id)
                                     }
                                     if (selectionMode) {
+                                        val selectionSplits = transactionSplitsMap[transaction.id] ?: emptyList()
                                         com.pennywiseai.tracker.ui.components.cards.TransactionItem(
                                             modifier = Modifier.animateItem(),
                                             transaction = transaction,
@@ -672,7 +673,8 @@ fun TransactionsScreen(
                                             convertedAmount = convertedAmounts[transaction.id],
                                             displayCurrency = if (isUnifiedMode) selectedCurrency else null,
                                             profileAccountKeys = profileAccountKeys,
-                                            splitCategories = transactionSplitsMap[transaction.id] ?: emptyList(),
+                                            splits = selectionSplits,
+                                            splitCategories = selectionSplits.map { it.category },
                                             onClick = { viewModel.toggleSelection(transaction.id) },
                                             onLongClick = longPressToggle,
                                             containerColor = rowContainerColor
@@ -683,6 +685,7 @@ fun TransactionsScreen(
                                                 transaction = transaction,
                                                 onRequestEdit = { pendingCategoryEditId = it.id }
                                             ) {
+                                                val cardSplits = transactionSplitsMap[transaction.id] ?: emptyList()
                                                 com.pennywiseai.tracker.ui.components.cards.TransactionItem(
                                                     transaction = transaction,
                                                     showDate = dateGroup == DateGroup.THIS_WEEK || dateGroup == DateGroup.EARLIER,
@@ -690,7 +693,8 @@ fun TransactionsScreen(
                                                     convertedAmount = convertedAmounts[transaction.id],
                                                     displayCurrency = if (isUnifiedMode) selectedCurrency else null,
                                                     profileAccountKeys = profileAccountKeys,
-                                                    splitCategories = transactionSplitsMap[transaction.id] ?: emptyList(),
+                                                    splits = cardSplits,
+                                                    splitCategories = cardSplits.map { it.category },
                                                     onClick = { onTransactionClick(transaction.id) },
                                                     onLongClick = longPressToggle
                                                 )

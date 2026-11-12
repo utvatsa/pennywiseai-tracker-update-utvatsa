@@ -1,5 +1,6 @@
 package com.pennywiseai.tracker.ui.components.cards
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -92,6 +93,7 @@ fun ListItemCardV2(
     amountColor: Color = MaterialTheme.colorScheme.onSurface,
     leadingContent: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (() -> Unit)? = null,
+    expandedContent: @Composable (() -> Unit)? = null,
     shape: CornerBasedShape = MaterialTheme.shapes.large,
     contentPadding: Dp = Dimensions.Padding.cardCompact,
     /** Overrides the card's container colour when set (e.g. for selected state). */
@@ -99,53 +101,63 @@ fun ListItemCardV2(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val row: @Composable () -> Unit = {
-        Row(
+    val cardContent: @Composable () -> Unit = {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // Keeps a row tappable even when its content is a single short
-                // line, without padding out rows that are already tall.
-                .defaultMinSize(minHeight = Dimensions.Component.minTouchTarget),
-            verticalAlignment = Alignment.CenterVertically
+                .animateContentSize()
         ) {
-            if (leadingContent != null) {
-                leadingContent()
-                Spacer(modifier = Modifier.width(Spacing.smd))
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Keeps a row tappable even when its content is a single short
+                    // line, without padding out rows that are already tall.
+                    .defaultMinSize(minHeight = Dimensions.Component.minTouchTarget),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = title,
-                    style = PennyWiseText.rowTitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (subtitle.isNotBlank()) {
+                if (leadingContent != null) {
+                    leadingContent()
+                    Spacer(modifier = Modifier.width(Spacing.smd))
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
+                ) {
                     Text(
-                        text = subtitle,
-                        style = PennyWiseText.metadata,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = title,
+                        style = PennyWiseText.rowTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = PennyWiseText.metadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(Spacing.sm))
+
+                if (trailingContent != null) {
+                    trailingContent()
+                } else {
+                    Text(
+                        text = amount,
+                        style = PennyWiseText.amountRow,
+                        color = amountColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(Spacing.sm))
-
-            if (trailingContent != null) {
-                trailingContent()
-            } else {
-                Text(
-                    text = amount,
-                    style = PennyWiseText.amountRow,
-                    color = amountColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            if (expandedContent != null) {
+                expandedContent()
             }
         }
     }
@@ -160,7 +172,7 @@ fun ListItemCardV2(
             // surrounding column's spacing carry the divisions better.
             border = BorderStroke(0.dp, Color.Transparent),
             onLongClick = onLongClick
-        ) { row() }
+        ) { cardContent() }
         return
     }
     // Tappable rows are M3 Expressive segmented list items: same resting shape
@@ -174,6 +186,6 @@ fun ListItemCardV2(
             ListItemDefaults.segmentedColors(containerColor = it, contentColor = contentColorFor(it))
         },
         contentPadding = PaddingValues(contentPadding),
-        content = row
+        content = cardContent
     )
 }
