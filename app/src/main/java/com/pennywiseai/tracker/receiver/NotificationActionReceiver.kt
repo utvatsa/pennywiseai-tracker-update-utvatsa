@@ -100,6 +100,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+        /** "Accept" on a transaction notification: confirms and dismisses with a brief confirmation toast. */
+        fun confirmIntent(context: Context, requestCode: Int, transactionId: Long, notificationId: Int): PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                Intent(context, NotificationActionReceiver::class.java).apply {
+                    action = ACTION_CONFIRM_TRANSACTION
+                    putExtra(EXTRA_TRANSACTION_ID, transactionId)
+                    putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
         /** "Not an expense"/"Not income" ([undo] false) and its Undo ([undo] true). */
         fun excludeIntent(context: Context, requestCode: Int, transactionId: Long, notificationId: Int, undo: Boolean): PendingIntent =
             PendingIntent.getBroadcast(
@@ -290,8 +303,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 
     private fun confirmTransaction(context: Context, notificationId: Int) {
-        // Simply dismiss the notification - transaction is already saved
+        // Dismiss the notification and show a brief confirmation feedback
         dismissNotification(context, notificationId)
+        CoroutineScope(Dispatchers.Main).launch {
+            Toast.makeText(context, context.getString(R.string.notif_txn_confirmed), Toast.LENGTH_SHORT).show()
+        }
         Log.d(TAG, "Transaction confirmed, notification dismissed")
     }
 

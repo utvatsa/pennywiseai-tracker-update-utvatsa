@@ -173,6 +173,7 @@ class SettingsViewModel @Inject constructor(
 
     val dailySummaryEnabled = userPreferencesRepository.dailySummaryEnabled
     val weeklySummaryEnabled = userPreferencesRepository.weeklySummaryEnabled
+    val transactionNotificationsEnabled = userPreferencesRepository.transactionNotificationsEnabled
 
     val conscienceEnabled = userPreferencesRepository.conscienceEnabled
 
@@ -459,6 +460,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.setDailySummaryEnabled(enabled)
             com.pennywiseai.tracker.worker.DailySummaryWorker.sync(context, enabled)
+        }
+    }
+
+    fun setTransactionNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setTransactionNotificationsEnabled(enabled)
         }
     }
 

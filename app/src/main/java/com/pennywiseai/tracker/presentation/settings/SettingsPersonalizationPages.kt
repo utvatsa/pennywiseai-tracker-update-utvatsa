@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +21,7 @@ import com.pennywiseai.tracker.data.manager.ConscienceText
 import com.pennywiseai.tracker.data.preferences.DAILY_SUMMARY_DEFAULT
 import com.pennywiseai.tracker.data.preferences.DateFormatStyle
 import com.pennywiseai.tracker.data.preferences.NumberFormatStyle
+import com.pennywiseai.tracker.data.preferences.TRANSACTION_NOTIFICATIONS_DEFAULT
 import com.pennywiseai.tracker.ui.components.cards.ListItemPosition
 import com.pennywiseai.tracker.ui.theme.green_dark
 import com.pennywiseai.tracker.ui.theme.green_light
@@ -148,9 +150,19 @@ private fun numberFormatStyleExample(style: NumberFormatStyle): String = stringR
 @Composable
 internal fun NotificationsPage(settingsViewModel: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
+    val transactionNotificationsEnabled by settingsViewModel.transactionNotificationsEnabled.collectAsStateWithLifecycle(initialValue = TRANSACTION_NOTIFICATIONS_DEFAULT)
     val dailySummaryEnabled by settingsViewModel.dailySummaryEnabled.collectAsStateWithLifecycle(initialValue = DAILY_SUMMARY_DEFAULT)
     val weeklySummaryEnabled by settingsViewModel.weeklySummaryEnabled.collectAsStateWithLifecycle(initialValue = false)
     val conscienceEnabled by settingsViewModel.conscienceEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val transactionNotificationsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            settingsViewModel.setTransactionNotificationsEnabled(true)
+        } else {
+            Toast.makeText(context, R.string.settings_transaction_notifications_needs_permission, Toast.LENGTH_LONG).show()
+        }
+    }
     // The recap is a notification: on Android 13+ turning it on asks for the
     // permission first, and a refusal leaves it off with a word on why.
     val dailySummaryPermissionLauncher = rememberLauncherForActivityResult(
@@ -200,6 +212,22 @@ internal fun NotificationsPage(settingsViewModel: SettingsViewModel = hiltViewMo
 
     SettingsGroup {
         SettingsSwitchRow(
+            icon = Icons.AutoMirrored.Filled.ReceiptLong,
+            iconBgColor = indigo_light,
+            iconTint = indigo_dark,
+            title = stringResource(R.string.settings_transaction_notifications_title),
+            subtitle = stringResource(R.string.settings_transaction_notifications_subtitle),
+            checked = transactionNotificationsEnabled,
+            onCheckedChange = { enabled ->
+                if (enabled && needsNotificationPermission()) {
+                    transactionNotificationsPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    settingsViewModel.setTransactionNotificationsEnabled(enabled)
+                }
+            },
+            position = ListItemPosition.Top
+        )
+        SettingsSwitchRow(
             icon = Icons.Default.Schedule,
             iconBgColor = indigo_light,
             iconTint = indigo_dark,
@@ -213,7 +241,7 @@ internal fun NotificationsPage(settingsViewModel: SettingsViewModel = hiltViewMo
                     settingsViewModel.setDailySummaryEnabled(enabled)
                 }
             },
-            position = ListItemPosition.Top
+            position = ListItemPosition.Middle
         )
         SettingsSwitchRow(
             icon = Icons.Default.Insights,
