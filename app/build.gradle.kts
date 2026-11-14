@@ -24,7 +24,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 116
-        versionName = "3.4.0-utvatsa"
+        versionName = "3.4.0-utvatsa-prounlocked"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
