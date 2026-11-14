@@ -121,7 +121,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             billAction: Boolean = false
         ): Pair<Int, Boolean> {
             val exclude = !billAction && !alreadyExcluded &&
-                type != TransactionType.TRANSFER && type != TransactionType.INVESTMENT
+                type != TransactionType.TRANSFER && type != TransactionType.INVESTMENT && type != TransactionType.CC_REPAYMENT
             val picks = if (uncategorized) 2 - listOf(billAction, exclude).count { it } else 0
             return picks to exclude
         }
@@ -836,7 +836,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             val amountPrefix = when (transaction.transactionType) {
                 TransactionType.INCOME -> "+"
                 TransactionType.EXPENSE, TransactionType.CREDIT, TransactionType.INVESTMENT -> "-"
-                TransactionType.TRANSFER -> ""
+                TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> ""
             }
             val formattedAmount = CurrencyFormatter.formatCurrency(transaction.amount, transaction.currency, maskIfHidden = false)
             val signedAmount = CurrencyFormatter.signed(amountPrefix, formattedAmount)
@@ -848,6 +848,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 TransactionType.EXPENSE -> context.getString(R.string.notif_txn_debit)
                 TransactionType.TRANSFER -> context.getString(R.string.txn_item_tag_transfer)
                 TransactionType.INVESTMENT -> context.getString(R.string.txn_item_tag_investment)
+                TransactionType.CC_REPAYMENT -> context.getString(R.string.txn_item_tag_cc_repayment)
             }
 
             // Title: signed amount + merchant name, resembling a transaction item

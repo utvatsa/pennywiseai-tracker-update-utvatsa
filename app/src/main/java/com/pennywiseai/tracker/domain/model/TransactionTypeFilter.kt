@@ -9,6 +9,7 @@ enum class TransactionTypeFilter {
     CREDIT,
     /** Expense + credit-card spend together (#898). Analytics-only, see [inTransactionsList]. */
     SPENDING,
+    CC_REPAYMENT,
     TRANSFER,
     INVESTMENT;
 
@@ -20,6 +21,7 @@ enum class TransactionTypeFilter {
             EXPENSE -> setOf(TransactionType.EXPENSE)
             CREDIT -> setOf(TransactionType.CREDIT)
             SPENDING -> setOf(TransactionType.EXPENSE, TransactionType.CREDIT)
+            CC_REPAYMENT -> setOf(TransactionType.CC_REPAYMENT)
             TRANSFER -> setOf(TransactionType.TRANSFER)
             INVESTMENT -> setOf(TransactionType.INVESTMENT)
         }

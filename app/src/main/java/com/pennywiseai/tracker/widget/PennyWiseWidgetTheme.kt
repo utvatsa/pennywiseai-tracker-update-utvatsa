@@ -35,7 +35,7 @@ object PennyWiseWidgetTheme {
     @Composable
     fun transactionAmountColor(type: TransactionType): ColorProvider = when (type) {
         TransactionType.INCOME -> ColorProvider(day = income_light, night = income_dark)
-        TransactionType.TRANSFER -> GlanceTheme.colors.onSurfaceVariant
+        TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> GlanceTheme.colors.onSurfaceVariant
         else -> GlanceTheme.colors.onSurface
     }
 

@@ -1,8 +1,6 @@
 package com.pennywiseai.tracker.ui.components.cards
 
 import androidx.annotation.StringRes
-import com.pennywiseai.tracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,8 +22,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.ui.theme.Spacing
 import com.pennywiseai.tracker.ui.theme.credit
 import com.pennywiseai.tracker.ui.theme.investment
@@ -55,13 +55,15 @@ fun CashFlowCard(
     creditCardSpend: BigDecimal,
     investments: BigDecimal,
     transfers: BigDecimal,
+    ccRepayments: BigDecimal = BigDecimal.ZERO,
     isBalanceHidden: Boolean,
     onToggleBalanceVisibility: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val channels = remember(creditCardSpend, investments, transfers) {
+    val channels = remember(creditCardSpend, investments, transfers, ccRepayments) {
         listOf(
             ChannelSlot(R.string.cash_flow_credit, creditCardSpend),
+            ChannelSlot(R.string.cash_flow_cc_repayment, ccRepayments),
             ChannelSlot(R.string.cash_flow_invested, investments),
             ChannelSlot(R.string.cash_flow_transferred, transfers)
         ).filter { it.amount.signum() != 0 }
@@ -99,6 +101,7 @@ fun CashFlowCard(
             for (ch in channels) {
                 val dotColor = when (ch.label) {
                     R.string.cash_flow_credit -> MaterialTheme.colorScheme.credit
+                    R.string.cash_flow_cc_repayment -> MaterialTheme.colorScheme.transfer
                     R.string.cash_flow_invested -> MaterialTheme.colorScheme.investment
                     R.string.cash_flow_transferred -> MaterialTheme.colorScheme.transfer
                     else -> MaterialTheme.colorScheme.onSurfaceVariant

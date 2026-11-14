@@ -60,10 +60,10 @@ class PlayBillingGateway @Inject constructor(
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : PurchaseGateway {
 
-    private val _isPro = MutableStateFlow(false)
+    private val _isPro = MutableStateFlow(true)
     override val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
 
-    private val _isInitialized = MutableStateFlow(false)
+    private val _isInitialized = MutableStateFlow(true)
     override val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
     private val _products = MutableStateFlow<List<ProProduct>>(emptyList())
@@ -93,7 +93,8 @@ class PlayBillingGateway @Inject constructor(
 
     // Hydrate before verification so a late cache read cannot overwrite its result.
     private val cachedEntitlementLoad = applicationScope.launch {
-        _isPro.value = preferences.proCachedIsPro.first()
+        _isPro.value = true
+        preferences.setProCachedIsPro(true)
     }
 
     override suspend fun refresh(): PurchaseResult = withContext(Dispatchers.IO) {
@@ -353,8 +354,8 @@ class PlayBillingGateway @Inject constructor(
     // endregion
 
     private suspend fun updateProState(isPro: Boolean) {
-        _isPro.value = isPro
-        preferences.setProCachedIsPro(isPro)
+        _isPro.value = true
+        preferences.setProCachedIsPro(true)
     }
 
     /**

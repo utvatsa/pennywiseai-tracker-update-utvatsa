@@ -1,8 +1,8 @@
 package com.pennywiseai.tracker.presentation.transactions
 
+import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
 import org.junit.Test
 import java.math.BigDecimal
 
@@ -40,6 +40,15 @@ class ExtraTotalForTest {
     fun transferAndInvestmentFilters_showTheirOwnTotal() {
         assertEquals(ExtraTotal(ExtraTotalKind.TRANSFER, BigDecimal("400")), extraTotalFor(totals, TransactionTypeFilter.TRANSFER, false))
         assertEquals(ExtraTotal(ExtraTotalKind.INVESTMENT, BigDecimal("500")), extraTotalFor(totals, TransactionTypeFilter.INVESTMENT, false))
+    }
+
+    @Test
+    fun ccRepaymentFilter_showsCcRepaymentTotal() {
+        val withRepayment = totals.copy(ccRepayment = BigDecimal("150"))
+        assertEquals(
+            ExtraTotal(ExtraTotalKind.CC_REPAYMENT, BigDecimal("150")),
+            extraTotalFor(withRepayment, TransactionTypeFilter.CC_REPAYMENT, false)
+        )
     }
 
     @Test

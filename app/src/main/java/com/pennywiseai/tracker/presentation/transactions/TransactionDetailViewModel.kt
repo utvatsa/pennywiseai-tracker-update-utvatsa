@@ -926,8 +926,8 @@ class TransactionDetailViewModel @Inject constructor(
             return
         }
 
-        // Validate self-transfer for TRANSFER transactions
-        if (toSave.transactionType == TransactionType.TRANSFER &&
+        // Validate self-transfer for TRANSFER and CC_REPAYMENT transactions
+        if ((toSave.transactionType == TransactionType.TRANSFER || toSave.transactionType == TransactionType.CC_REPAYMENT) &&
             toSave.fromAccount != null &&
             toSave.toAccount != null &&
             toSave.fromAccount == toSave.toAccount &&

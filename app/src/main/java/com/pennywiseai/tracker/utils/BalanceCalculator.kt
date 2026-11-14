@@ -93,7 +93,7 @@ object BalanceCalculator {
             explicitBalance != null -> explicitBalance
             isCreditCard -> {
                 when (transactionType) {
-                    TransactionType.INCOME -> {
+                    TransactionType.INCOME, TransactionType.CC_REPAYMENT -> {
                         // Refunds or repayments reduce outstanding debt
                         cur - transactionAmount
                     }
@@ -111,7 +111,7 @@ object BalanceCalculator {
             else -> {
                 when (transactionType) {
                     TransactionType.INCOME -> cur + transactionAmount
-                    TransactionType.EXPENSE, TransactionType.INVESTMENT -> cur - transactionAmount
+                    TransactionType.EXPENSE, TransactionType.INVESTMENT, TransactionType.CC_REPAYMENT -> cur - transactionAmount
                     TransactionType.TRANSFER, TransactionType.CREDIT -> {
                         // Transfers/credits on debit accounts do not change standard balance directly
                         cur
@@ -146,7 +146,8 @@ object BalanceCalculator {
         TransactionType.EXPENSE,
         TransactionType.CREDIT,
         TransactionType.INVESTMENT -> if (isCreditCard) amount else amount.negate()
-        TransactionType.TRANSFER -> BigDecimal.ZERO
+        TransactionType.TRANSFER,
+        TransactionType.CC_REPAYMENT -> BigDecimal.ZERO
     }
 
     /**

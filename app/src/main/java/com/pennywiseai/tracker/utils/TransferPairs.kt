@@ -11,7 +11,7 @@ import java.time.Duration
  * account, and the pair counts once in a total.
  */
 val TransactionEntity.isPairedTransferLeg: Boolean
-    get() = transactionType == TransactionType.TRANSFER && transferPairId != null
+    get() = (transactionType == TransactionType.TRANSFER || transactionType == TransactionType.CC_REPAYMENT) && transferPairId != null
 
 /** EXPENSE if this row is the transfer's source, INCOME if its destination, else TRANSFER. */
 private fun TransactionEntity.ownLegType(): TransactionType {

@@ -1,10 +1,10 @@
 package com.pennywiseai.tracker.data.repository
 
+import com.pennywiseai.tracker.data.currency.CurrencyConversionService
 import com.pennywiseai.tracker.data.database.dao.TransactionDao
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.expandWithChildren
 import com.pennywiseai.tracker.data.model.*
-import com.pennywiseai.tracker.data.currency.CurrencyConversionService
 import com.pennywiseai.tracker.data.preferences.CurrencyPreferences
 import com.pennywiseai.tracker.utils.forTotals
 import kotlinx.coroutines.flow.first
@@ -25,7 +25,7 @@ class AiContextRepository @Inject constructor(
     private val loanRepository: LoanRepository,
     private val categoryDao: com.pennywiseai.tracker.data.database.dao.CategoryDao
 ) {
-    
+
     /** This month so far, in the base currency: all the chat's prompt and summary tool need. */
     suspend fun getMonthSummary(): MonthSummary =
         getMonthSummary(LocalDate.now(), userPreferencesRepository.baseCurrency.first())
@@ -34,7 +34,7 @@ class AiContextRepository @Inject constructor(
         val yearMonth = YearMonth.from(currentDate)
         val startOfMonth = yearMonth.atDay(1)
         val endOfMonth = yearMonth.atEndOfMonth()
-        
+
         // Get all transactions for current month
         val transactions = transactionDao.getTransactionsBetweenDatesList(
             startOfMonth.atStartOfDay(),
@@ -44,7 +44,7 @@ class AiContextRepository @Inject constructor(
         var totalIncome = BigDecimal.ZERO
         var totalExpense = BigDecimal.ZERO
         val transactionCount = transactions.size
-        
+
         // Process in a single pass
         transactions.forEach { transaction ->
             // Skip unconvertible amounts rather than counting face value (#670).
@@ -59,9 +59,10 @@ class AiContextRepository @Inject constructor(
                 TransactionType.CREDIT -> totalExpense = totalExpense.add(convertedAmount) // Credit counts as expense
                 TransactionType.TRANSFER -> {} // Transfers don't affect income/expense totals
                 TransactionType.INVESTMENT -> {} // Investments are asset reallocation, not expenses
+                TransactionType.CC_REPAYMENT -> {} // Credit card repayments are debt settlements, not living expenses
             }
         }
-        
+
         return MonthSummary(
             totalIncome = totalIncome,
             totalExpense = totalExpense,
@@ -70,7 +71,7 @@ class AiContextRepository @Inject constructor(
             currentDay = currentDate.dayOfMonth
         )
     }
-    
+
     /** This month's spend in one category, for the chat's lookup tool (#170). Null = nothing found. */
     suspend fun getCategorySpending(category: String): CategorySpending? {
         val baseCurrency = userPreferencesRepository.baseCurrency.first()
@@ -108,7 +109,7 @@ class AiContextRepository @Inject constructor(
         val yearMonth = YearMonth.from(currentDate)
         val startOfMonth = yearMonth.atDay(1)
         val endOfMonth = yearMonth.atEndOfMonth()
-        
+
         val transactions = transactionDao.getTransactionsBetweenDatesList(
             startOfMonth.atStartOfDay(),
             endOfMonth.atTime(23, 59, 59)
@@ -117,7 +118,7 @@ class AiContextRepository @Inject constructor(
         // Group by category and calculate spending
         val categoryMap = mutableMapOf<String, MutableList<BigDecimal>>()
         var totalExpense = BigDecimal.ZERO
-        
+
         transactions
             // Credit counts as expense, as in getMonthSummary: a category can't total less than its spends.
             .filter { it.transactionType == TransactionType.EXPENSE || it.transactionType == TransactionType.CREDIT }
@@ -131,7 +132,7 @@ class AiContextRepository @Inject constructor(
                 categoryMap.getOrPut(category) { mutableListOf() }.add(convertedAmount)
                 totalExpense = totalExpense.add(convertedAmount)
             }
-        
+
         return categoryMap.map { (category, amounts) ->
             val categoryTotal = amounts.reduce { acc, amount -> acc.add(amount) }
             val percentage = if (totalExpense > BigDecimal.ZERO) {
@@ -139,7 +140,7 @@ class AiContextRepository @Inject constructor(
                     .multiply(BigDecimal(100))
                     .toFloat()
             } else 0f
-            
+
             CategorySpending(
                 category = category,
                 amount = categoryTotal,

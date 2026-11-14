@@ -80,7 +80,7 @@ fun TransactionItem(
             ?.takeIf { it.isSpecified }
             ?: colorScheme.onSurface
         TransactionType.CREDIT -> colorScheme.credit
-        TransactionType.TRANSFER -> colorScheme.transfer
+        TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> colorScheme.transfer
         TransactionType.INVESTMENT -> colorScheme.investment
     }
 
@@ -153,6 +153,7 @@ fun TransactionItem(
                             add(resources.getString(R.string.txn_item_tag_transfer))
                         }
                     }
+                    TransactionType.CC_REPAYMENT -> add(resources.getString(R.string.txn_item_tag_cc_repayment))
                     TransactionType.INVESTMENT -> add(resources.getString(R.string.txn_item_tag_investment))
                     else -> {}
                 }
@@ -172,7 +173,7 @@ fun TransactionItem(
         when (transaction.transactionType) {
             TransactionType.INCOME -> "+"
             TransactionType.EXPENSE, TransactionType.CREDIT, TransactionType.INVESTMENT -> "-"
-            TransactionType.TRANSFER -> ""
+            TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> ""
         }
     }
 

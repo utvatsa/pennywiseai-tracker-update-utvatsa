@@ -254,9 +254,10 @@ class CsvTransactionImporter @Inject constructor() {
         return when (raw.trim().lowercase()) {
             "income" -> TransactionType.INCOME
             "expense" -> TransactionType.EXPENSE
-            "credit card", "credit" -> TransactionType.CREDIT
+            "credit card", "credit", "credit card spend", "credit spend" -> TransactionType.CREDIT
             "transfer" -> TransactionType.TRANSFER
             "investment" -> TransactionType.INVESTMENT
+            "credit card repayment", "cc repayment", "repayment", "cc_repayment" -> TransactionType.CC_REPAYMENT
             else -> null
         }
     }

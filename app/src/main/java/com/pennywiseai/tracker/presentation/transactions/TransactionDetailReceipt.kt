@@ -77,14 +77,14 @@ internal fun TransactionReceipt(
         TransactionType.INCOME -> MaterialTheme.colorScheme.income
         TransactionType.EXPENSE -> MaterialTheme.colorScheme.onSurface
         TransactionType.CREDIT -> MaterialTheme.colorScheme.credit
-        TransactionType.TRANSFER -> MaterialTheme.colorScheme.transfer
+        TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> MaterialTheme.colorScheme.transfer
         TransactionType.INVESTMENT -> MaterialTheme.colorScheme.investment
     }
     val sign = when (transaction.transactionType) {
         TransactionType.INCOME -> "+"
         TransactionType.EXPENSE -> "-"
         TransactionType.CREDIT -> ""
-        TransactionType.TRANSFER -> ""
+        TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> ""
         TransactionType.INVESTMENT -> ""
     }
 
@@ -158,6 +158,7 @@ internal fun TransactionReceipt(
                         TransactionType.CREDIT -> R.string.txn_type_credit
                         TransactionType.TRANSFER -> R.string.txn_type_transfer
                         TransactionType.INVESTMENT -> R.string.txn_type_investment
+                        TransactionType.CC_REPAYMENT -> R.string.txn_type_cc_repayment
                     }
                 )
                 val typeIcon = when (transaction.transactionType) {
@@ -166,6 +167,7 @@ internal fun TransactionReceipt(
                     TransactionType.CREDIT -> Icons.Default.CreditCard
                     TransactionType.TRANSFER -> Icons.Default.SwapHoriz
                     TransactionType.INVESTMENT -> Icons.AutoMirrored.Filled.ShowChart
+                    TransactionType.CC_REPAYMENT -> Icons.Default.Payments
                 }
                 SuggestionChip(
                     onClick = {},

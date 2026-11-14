@@ -1,15 +1,12 @@
 package com.pennywiseai.tracker.presentation.transactions
 
-import com.pennywiseai.tracker.R
-import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
-import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -17,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.SettingsEthernet
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
@@ -25,8 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.pennywiseai.tracker.R
+import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
 import com.pennywiseai.tracker.ui.theme.*
 import com.pennywiseai.tracker.utils.CurrencyFormatter
 import java.math.BigDecimal
@@ -113,6 +114,7 @@ fun TransactionTotalsCard(
                             ExtraTotalKind.CREDIT -> Triple(Icons.Filled.CreditCard, stringResource(R.string.txn_totals_credit), MaterialTheme.colorScheme.credit)
                             ExtraTotalKind.TRANSFER -> Triple(Icons.Filled.SwapHoriz, stringResource(R.string.txn_totals_transfer), MaterialTheme.colorScheme.transfer)
                             ExtraTotalKind.INVESTMENT -> Triple(Icons.AutoMirrored.Filled.ShowChart, stringResource(R.string.txn_totals_invest), MaterialTheme.colorScheme.investment)
+                            ExtraTotalKind.CC_REPAYMENT -> Triple(Icons.Filled.Payments, stringResource(R.string.filter_type_cc_repayment), MaterialTheme.colorScheme.transfer)
                         }
                         add(TotalTileData(extraIcon, extraLabel, CurrencyFormatter.formatCurrency(extra.amount, currency), extraColor, expenseAlpha))
                     }
@@ -258,7 +260,7 @@ private fun CurrencyPickerPill(
     }
 }
 
-enum class ExtraTotalKind { CREDIT, TRANSFER, INVESTMENT }
+enum class ExtraTotalKind { CREDIT, TRANSFER, INVESTMENT, CC_REPAYMENT }
 
 data class ExtraTotal(val kind: ExtraTotalKind, val amount: BigDecimal)
 
@@ -273,6 +275,7 @@ data class ExtraTotal(val kind: ExtraTotalKind, val amount: BigDecimal)
 internal fun extraTotalFor(totals: FilteredTotals, typeFilter: TransactionTypeFilter, selectionMode: Boolean): ExtraTotal? = when {
     !selectionMode && typeFilter == TransactionTypeFilter.TRANSFER -> ExtraTotal(ExtraTotalKind.TRANSFER, totals.transfer)
     !selectionMode && typeFilter == TransactionTypeFilter.INVESTMENT -> ExtraTotal(ExtraTotalKind.INVESTMENT, totals.investment)
+    !selectionMode && typeFilter == TransactionTypeFilter.CC_REPAYMENT -> ExtraTotal(ExtraTotalKind.CC_REPAYMENT, totals.ccRepayment)
     selectionMode || typeFilter == TransactionTypeFilter.CREDIT || totals.credit.signum() != 0 -> ExtraTotal(ExtraTotalKind.CREDIT, totals.credit)
     else -> null
 }

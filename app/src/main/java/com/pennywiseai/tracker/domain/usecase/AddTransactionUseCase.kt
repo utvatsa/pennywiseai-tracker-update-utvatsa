@@ -1,13 +1,13 @@
 package com.pennywiseai.tracker.domain.usecase
 
+import com.pennywiseai.tracker.data.database.PennyWiseDatabase
 import com.pennywiseai.tracker.data.database.entity.AccountBalanceEntity
+import com.pennywiseai.tracker.data.database.entity.BudgetImpactType
 import com.pennywiseai.tracker.data.database.entity.SubscriptionEntity
 import com.pennywiseai.tracker.data.database.entity.SubscriptionState
-import com.pennywiseai.tracker.data.database.entity.BudgetImpactType
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.withTransaction
-import com.pennywiseai.tracker.data.database.PennyWiseDatabase
 import com.pennywiseai.tracker.data.model.TransactionDraft
 import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.SubscriptionRepository
@@ -47,7 +47,7 @@ class AddTransactionUseCase @Inject constructor(
             merchant = merchant,
             date = date
         )
-        
+
         // Create the transaction entity
         val transaction = TransactionEntity(
             amount = amount,
@@ -160,7 +160,8 @@ class AddTransactionUseCase @Inject constructor(
         fromBankName: String,
         fromLast4: String,
         toBankName: String,
-        toLast4: String
+        toLast4: String,
+        type: TransactionType = TransactionType.TRANSFER
     ) {
         // Unique hash incorporating both legs — with bank names, not just last4 —
         // so two distinct transfers (e.g. Kotak ••9999 vs HDFC ••9999 to the same
@@ -177,9 +178,9 @@ class AddTransactionUseCase @Inject constructor(
 
         val transaction = TransactionEntity(
             amount = amount,
-            merchantName = "Transfer",
-            category = "Others",
-            transactionType = TransactionType.TRANSFER,
+            merchantName = if (type == TransactionType.CC_REPAYMENT) "CC Repayment" else "Transfer",
+            category = if (type == TransactionType.CC_REPAYMENT) "Bill Payment" else "Others",
+            transactionType = type,
             dateTime = date,
             description = notes,
             reference = reference,
@@ -221,7 +222,7 @@ class AddTransactionUseCase @Inject constructor(
     ): String {
         // Create a unique hash for manual transactions
         // Format: MANUAL_<amount>_<merchant>_<datetime>
-        val data = "MANUAL_${amount}_${merchant}_${date}"
+        val data = "MANUAL_${amount}_${merchant}_$date"
 
         return MessageDigest.getInstance("MD5")
             .digest(data.toByteArray())
@@ -237,7 +238,7 @@ class AddTransactionUseCase @Inject constructor(
         date: LocalDateTime
     ): String {
         // Format: TRANSFER_<amount>_<fromBank>_<from>_<toBank>_<to>_<datetime>
-        val data = "TRANSFER_${amount}_${fromBankName}_${fromLast4}_${toBankName}_${toLast4}_${date}"
+        val data = "TRANSFER_${amount}_${fromBankName}_${fromLast4}_${toBankName}_${toLast4}_$date"
 
         return MessageDigest.getInstance("MD5")
             .digest(data.toByteArray())

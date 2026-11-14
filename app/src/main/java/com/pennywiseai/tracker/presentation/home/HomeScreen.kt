@@ -629,6 +629,7 @@ fun HomeScreen(
                                         // "Spent this month", so drop it from this "outside cash flow"
                                         // card (a zero channel is filtered out) to avoid double-showing.
                                         creditCardSpend = if (uiState.countCreditCardAsExpense) BigDecimal.ZERO else uiState.currentMonthCreditCard,
+                                        ccRepayments = uiState.currentMonthCcRepayment,
                                         investments = uiState.currentMonthInvestment,
                                         transfers = uiState.currentMonthTransfer,
                                         isBalanceHidden = uiState.isBalanceHidden,

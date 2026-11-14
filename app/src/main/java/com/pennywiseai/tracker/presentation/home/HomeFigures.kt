@@ -120,6 +120,7 @@ internal data class MotionTotals(
     val credit: BigDecimal,
     val transfer: BigDecimal,
     val investment: BigDecimal,
+    val ccRepayment: BigDecimal = BigDecimal.ZERO
 )
 
 /**
@@ -134,16 +135,18 @@ internal inline fun moneyInMotion(
     var credit = BigDecimal.ZERO
     var transfer = BigDecimal.ZERO
     var investment = BigDecimal.ZERO
+    var ccRepayment = BigDecimal.ZERO
     for (tx in rows.countingTransferPairsOnce { it }) {
         val amount = amountOf(tx) ?: continue
         when (tx.transactionType) {
             TransactionType.CREDIT -> credit += amount
             TransactionType.TRANSFER -> transfer += amount
             TransactionType.INVESTMENT -> investment += amount
+            TransactionType.CC_REPAYMENT -> ccRepayment += amount
             else -> { /* skip */ }
         }
     }
-    return MotionTotals(credit, transfer, investment)
+    return MotionTotals(credit, transfer, investment, ccRepayment)
 }
 
 /**
