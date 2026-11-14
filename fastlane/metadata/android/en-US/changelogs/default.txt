@@ -1,7 +1,5 @@
-Version 3.4.0-utvatsa
+Version 3.5.0-utvatsa
 
 New Features:
 • 
-• refined centered pie chart, bottom legend, and high-contrast styling
-• top categories subcategory breakdown in list and pie chart
 
