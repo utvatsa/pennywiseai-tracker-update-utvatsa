@@ -1435,6 +1435,7 @@ data class FilteredTotals(
     val credit: BigDecimal = BigDecimal.ZERO,
     val transfer: BigDecimal = BigDecimal.ZERO,
     val investment: BigDecimal = BigDecimal.ZERO,
+    val ccRepayment: BigDecimal = BigDecimal.ZERO,
     val netBalance: BigDecimal = BigDecimal.ZERO,
     val transactionCount: Int = 0
 )

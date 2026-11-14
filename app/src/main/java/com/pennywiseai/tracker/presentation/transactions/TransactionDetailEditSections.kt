@@ -303,7 +303,7 @@ internal fun EditableExtractedInfoCard(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(1.5.dp)
         ) {
-            if (transaction.transactionType == TransactionType.TRANSFER) {
+            if (transaction.transactionType == TransactionType.TRANSFER || transaction.transactionType == TransactionType.CC_REPAYMENT) {
                 AccountNumberField(
                     accountNumber = transaction.fromAccount,
                     onAccountNumberChange = { viewModel.updateFromAccount(it) },
@@ -592,4 +592,5 @@ internal fun transactionTypeLabel(type: TransactionType): Int = when (type) {
     TransactionType.CREDIT -> R.string.txn_type_credit
     TransactionType.TRANSFER -> R.string.txn_type_transfer
     TransactionType.INVESTMENT -> R.string.txn_type_investment
+    TransactionType.CC_REPAYMENT -> R.string.txn_type_cc_repayment
 }

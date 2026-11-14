@@ -6,7 +6,6 @@ enum class TransactionType {
     CREDIT,
     TRANSFER,
     INVESTMENT,
+    CC_REPAYMENT,
     BALANCE_UPDATE
 }
-
-

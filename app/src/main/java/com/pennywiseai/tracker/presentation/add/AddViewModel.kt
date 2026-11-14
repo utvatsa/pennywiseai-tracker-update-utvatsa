@@ -1,37 +1,37 @@
 package com.pennywiseai.tracker.presentation.add
 
-import com.pennywiseai.tracker.ui.components.pickerDefault
-import com.pennywiseai.tracker.presentation.transactions.normalizeReference
-import com.pennywiseai.tracker.ui.UiText
-import com.pennywiseai.tracker.R
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pennywiseai.parser.core.GenericTransactionExtractor
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.AccountBalanceEntity
 import com.pennywiseai.tracker.data.database.entity.BudgetImpactType
-import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.database.entity.SubscriptionState
+import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.data.preferences.CurrencyPreferences
+import com.pennywiseai.tracker.data.preferences.LearnedSendersStore
 import com.pennywiseai.tracker.data.receipt.ReceiptManager
 import com.pennywiseai.tracker.data.repository.AccountBalanceRepository
 import com.pennywiseai.tracker.data.repository.BudgetGroupRepository
 import com.pennywiseai.tracker.data.repository.CategoryRepository
-import com.pennywiseai.tracker.data.repository.TagRepository
 import com.pennywiseai.tracker.data.repository.MerchantMappingRepository
+import com.pennywiseai.tracker.data.repository.TagRepository
 import com.pennywiseai.tracker.data.repository.TransactionRepository
 import com.pennywiseai.tracker.data.repository.UnrecognizedSmsRepository
-import com.pennywiseai.tracker.data.preferences.LearnedSendersStore
-import com.pennywiseai.parser.core.GenericTransactionExtractor
-import com.pennywiseai.tracker.domain.usecase.AddTransactionUseCase
 import com.pennywiseai.tracker.domain.usecase.AddSubscriptionUseCase
+import com.pennywiseai.tracker.domain.usecase.AddTransactionUseCase
 import com.pennywiseai.tracker.domain.usecase.GetCategoriesUseCase
-import android.util.Log
+import com.pennywiseai.tracker.presentation.transactions.normalizeReference
+import com.pennywiseai.tracker.ui.UiText
+import com.pennywiseai.tracker.ui.components.pickerDefault
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.Instant
@@ -85,15 +85,15 @@ class AddViewModel @Inject constructor(
     private val draftDateTime: LocalDateTime? = savedStateHandle.get<String>("dateTime")
         ?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
     private val unrecognizedSmsId: Long? = savedStateHandle.get<Long>("unrecognizedSmsId")
-    
+
     // General UI State
     private val _uiState = MutableStateFlow(AddUiState())
     val uiState: StateFlow<AddUiState> = _uiState.asStateFlow()
-    
+
     // Transaction Tab State
     private val _transactionUiState = MutableStateFlow(TransactionUiState())
     val transactionUiState: StateFlow<TransactionUiState> = _transactionUiState.asStateFlow()
-    
+
     // Subscription Tab State
     private val _subscriptionUiState = MutableStateFlow(SubscriptionUiState())
     val subscriptionUiState: StateFlow<SubscriptionUiState> = _subscriptionUiState.asStateFlow()
@@ -107,8 +107,7 @@ class AddViewModel @Inject constructor(
     // Tracks the in-flight merchant→category lookup so a newer merchant/type
     // change supersedes a slower earlier one instead of landing stale. (#678)
     private var merchantSuggestionJob: Job? = null
-    
-    
+
     init {
         // Load base currency and set as default for both transaction and subscription
         viewModelScope.launch {
@@ -265,7 +264,7 @@ class AddViewModel @Inject constructor(
         _transactionUiState.update { currentState ->
             // For a TRANSFER, the FROM account drives the entry currency so the
             // two figures can't silently disagree (we never sum across currencies).
-            val currency = if (currentState.transactionType == TransactionType.TRANSFER && account != null) {
+            val currency = if ((currentState.transactionType == TransactionType.TRANSFER || currentState.transactionType == TransactionType.CC_REPAYMENT) && account != null) {
                 account.currency
             } else {
                 currentState.currency
@@ -286,7 +285,7 @@ class AddViewModel @Inject constructor(
         val filtered = amount.filter { it.isDigit() || it == '.' }
         val decimalCount = filtered.count { it == '.' }
         val validAmount = if (decimalCount <= 1) filtered else _transactionUiState.value.amount
-        
+
         _transactionUiState.update { currentState ->
             currentState.copy(
                 amount = validAmount,
@@ -294,7 +293,7 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun updateTransactionType(type: TransactionType) {
         _transactionUiState.update { currentState ->
             currentState.copy(
@@ -304,17 +303,18 @@ class AddViewModel @Inject constructor(
                     TransactionType.EXPENSE -> "Others"
                     TransactionType.INVESTMENT -> "Investment"
                     TransactionType.CREDIT -> "Shopping"
+                    TransactionType.CC_REPAYMENT -> "Bill Payment"
                     else -> currentState.category
                 },
                 budgetImpactType = if (type != TransactionType.INCOME) null else currentState.budgetImpactType,
                 budgetCategory = if (type != TransactionType.INCOME) null else currentState.budgetCategory,
-                // The To account only applies to a transfer — drop it when leaving
-                // TRANSFER so a stale selection can't silently pre-fill a later one.
-                toAccount = if (type == TransactionType.TRANSFER) currentState.toAccount else null
+                // The To account only applies to a transfer or CC repayment — drop it when leaving
+                // so a stale selection can't silently pre-fill a later one.
+                toAccount = if (type == TransactionType.TRANSFER || type == TransactionType.CC_REPAYMENT) currentState.toAccount else null
             )
         }
     }
-    
+
     fun updateTransactionMerchant(merchant: String) {
         _transactionUiState.update { currentState ->
             currentState.copy(
@@ -347,7 +347,7 @@ class AddViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun updateTransactionCategory(category: String) {
         _transactionUiState.update { currentState ->
             currentState.copy(
@@ -356,7 +356,7 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     /**
      * "Add category" from the picker (#835): creates a category of the current
      * type and selects it. A same-name category of the other type is reported
@@ -411,21 +411,21 @@ class AddViewModel @Inject constructor(
         val localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
         val currentTime = _transactionUiState.value.date.toLocalTime()
         val newDateTime = LocalDateTime.of(localDate, currentTime)
-        
+
         _transactionUiState.update { currentState ->
             currentState.copy(date = newDateTime)
         }
     }
-    
+
     fun updateTransactionTime(hour: Int, minute: Int) {
         val currentDate = _transactionUiState.value.date.toLocalDate()
         val newDateTime = currentDate.atTime(hour, minute)
-        
+
         _transactionUiState.update { currentState ->
             currentState.copy(date = newDateTime)
         }
     }
-    
+
     fun updateTransactionNotes(notes: String) {
         _transactionUiState.update { currentState ->
             currentState.copy(notes = notes)
@@ -450,7 +450,7 @@ class AddViewModel @Inject constructor(
             currentState.copy(tags = currentState.tags.filterNot { it.equals(tag, ignoreCase = true) })
         }
     }
-    
+
     fun updateTransactionRecurring(isRecurring: Boolean) {
         _transactionUiState.update { currentState ->
             currentState.copy(isRecurring = isRecurring)
@@ -468,7 +468,7 @@ class AddViewModel @Inject constructor(
     }
 
     fun createCameraUri(): Uri = receiptManager.createCameraUri()
-    
+
     fun updateBudgetImpactType(type: BudgetImpactType?) {
         _transactionUiState.update { it.copy(budgetImpactType = type, budgetCategory = keptBudgetCategory(type, it.budgetCategory)) }
     }
@@ -486,7 +486,7 @@ class AddViewModel @Inject constructor(
 
     fun saveTransaction(onSuccess: () -> Unit) {
         val state = _transactionUiState.value
-        val isTransfer = state.transactionType == TransactionType.TRANSFER
+        val isTransfer = state.transactionType == TransactionType.TRANSFER || state.transactionType == TransactionType.CC_REPAYMENT
 
         val amountError = validateAmount(state.amount)
         // Transfers have no merchant/category to validate.
@@ -600,7 +600,8 @@ class AddViewModel @Inject constructor(
                     fromBankName = from.bankName,
                     fromLast4 = from.accountLast4,
                     toBankName = to.bankName,
-                    toLast4 = to.accountLast4
+                    toLast4 = to.accountLast4,
+                    type = state.transactionType
                 )
                 // A suggestion saved as a transfer is handled too (#994).
                 // The SMS speaks for one leg: the receiving account for a credit, the paying one otherwise.
@@ -620,7 +621,7 @@ class AddViewModel @Inject constructor(
             }
         }
     }
-    
+
     // Subscription Tab Functions
     fun updateSubscriptionService(service: String) {
         _subscriptionUiState.update { currentState ->
@@ -630,12 +631,12 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun updateSubscriptionAmount(amount: String) {
         val filtered = amount.filter { it.isDigit() || it == '.' }
         val decimalCount = filtered.count { it == '.' }
         val validAmount = if (decimalCount <= 1) filtered else _subscriptionUiState.value.amount
-        
+
         _subscriptionUiState.update { currentState ->
             currentState.copy(
                 amount = validAmount,
@@ -643,7 +644,7 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun updateSubscriptionBillingCycle(cycle: String) {
         _subscriptionUiState.update { currentState ->
             currentState.copy(
@@ -670,16 +671,16 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun updateSubscriptionNextPaymentDate(dateMillis: Long) {
         val instant = Instant.ofEpochMilli(dateMillis)
         val localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
-        
+
         _subscriptionUiState.update { currentState ->
             currentState.copy(nextPaymentDate = localDate)
         }
     }
-    
+
     fun updateSubscriptionCategory(category: String) {
         _subscriptionUiState.update { currentState ->
             currentState.copy(
@@ -688,7 +689,7 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun updateSubscriptionNotes(notes: String) {
         _subscriptionUiState.update { currentState ->
             currentState.copy(notes = notes)
@@ -711,18 +712,18 @@ class AddViewModel @Inject constructor(
             )
         }
     }
-    
+
     fun saveSubscription(onSuccess: () -> Unit) {
         val state = _subscriptionUiState.value
         Log.d("AddViewModel", "saveSubscription called with state: $state")
-        
+
         // Validate all fields
         val serviceError = if (state.serviceName.isBlank()) UiText.Res(R.string.add_error_service_required) else null
         val amountError = validateAmount(state.amount)
         val categoryError = validateCategory(state.category)
-        
+
         Log.d("AddViewModel", "Validation - serviceError: $serviceError, amountError: $amountError, categoryError: $categoryError")
-        
+
         if (serviceError != null || amountError != null || categoryError != null) {
             _subscriptionUiState.update { currentState ->
                 currentState.copy(
@@ -733,18 +734,18 @@ class AddViewModel @Inject constructor(
             }
             return
         }
-        
+
         viewModelScope.launch {
             try {
                 Log.d("AddViewModel", "Starting to save subscription...")
                 _subscriptionUiState.update { it.copy(isLoading = true) }
-                
+
                 val amount = BigDecimal(state.amount)
                 Log.d("AddViewModel", "Calling addSubscriptionUseCase.execute with: " +
                     "merchantName=${state.serviceName.trim()}, amount=$amount, " +
                     "nextPaymentDate=${state.nextPaymentDate}, billingCycle=${state.billingCycle}, " +
                     "category=${state.category}")
-                
+
                 val subscriptionId = addSubscriptionUseCase.execute(
                     merchantName = state.serviceName.trim(),
                     amount = amount,
@@ -759,7 +760,7 @@ class AddViewModel @Inject constructor(
                     bankName = state.selectedAccount?.bankName,
                     accountLast4 = state.selectedAccount?.accountLast4
                 )
-                
+
                 Log.d("AddViewModel", "Subscription saved successfully with ID: $subscriptionId")
                 onSuccess()
             } catch (e: Exception) {
@@ -776,8 +777,7 @@ class AddViewModel @Inject constructor(
             }
         }
     }
-    
-    
+
     // Validation helpers
     private fun validateAmount(amount: String): UiText? {
         return when {
@@ -787,7 +787,7 @@ class AddViewModel @Inject constructor(
             else -> null
         }
     }
-    
+
     private fun validateMerchant(merchant: String): UiText? {
         return when {
             merchant.isBlank() -> UiText.Res(R.string.add_error_merchant_required)
@@ -795,7 +795,7 @@ class AddViewModel @Inject constructor(
             else -> null
         }
     }
-    
+
     private fun validateCategory(category: String): UiText? {
         return when {
             category.isBlank() -> UiText.Res(R.string.add_error_category_required)
@@ -836,12 +836,12 @@ data class TransactionUiState(
     val isValid: Boolean
         get() {
             val amountOk = amount.isNotBlank() &&
-                    amount.toDoubleOrNull() != null &&
-                    amount.toDouble() > 0 &&
-                    amountError == null
+                amount.toDoubleOrNull() != null &&
+                amount.toDouble() > 0 &&
+                amountError == null
             if (!amountOk) return false
 
-            if (transactionType == TransactionType.TRANSFER) {
+            if (transactionType == TransactionType.TRANSFER || transactionType == TransactionType.CC_REPAYMENT) {
                 // Transfers move money between two distinct accounts of the same
                 // currency (we never sum across currencies). No merchant needed.
                 val from = selectedAccount ?: return false
@@ -850,10 +850,10 @@ data class TransactionUiState(
             }
 
             return merchant.isNotBlank() &&
-                    category.isNotBlank() &&
-                    merchantError == null &&
-                    categoryError == null &&
-                    (budgetImpactType == null || budgetCategory != null)
+                category.isNotBlank() &&
+                merchantError == null &&
+                categoryError == null &&
+                (budgetImpactType == null || budgetCategory != null)
         }
 }
 
@@ -887,12 +887,12 @@ data class SubscriptionUiState(
 ) {
     val isValid: Boolean
         get() = serviceName.isNotBlank() &&
-                amount.isNotBlank() &&
-                amount.toDoubleOrNull() != null &&
-                amount.toDouble() > 0 &&
-                billingCycle.isNotBlank() &&
-                category.isNotBlank() &&
-                serviceError == null &&
-                amountError == null &&
-                categoryError == null
+            amount.isNotBlank() &&
+            amount.toDoubleOrNull() != null &&
+            amount.toDouble() > 0 &&
+            billingCycle.isNotBlank() &&
+            category.isNotBlank() &&
+            serviceError == null &&
+            amountError == null &&
+            categoryError == null
 }
