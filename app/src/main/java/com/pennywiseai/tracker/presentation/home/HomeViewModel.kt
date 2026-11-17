@@ -169,6 +169,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /** Dismisses all open transaction notifications across the app. */
+    fun dismissAllNotifications() {
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissAllTransactionAlerts(context)
+    }
+
     /**
      * The user's current budget cycle window (start, end). Recomputed whenever
      * the start day pref changes — used everywhere the home surface used to
