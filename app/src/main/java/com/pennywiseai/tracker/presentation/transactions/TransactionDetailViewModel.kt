@@ -252,6 +252,7 @@ class TransactionDetailViewModel @Inject constructor(
                 txn.copy(excludedFromAnalytics = excluded, updatedAt = LocalDateTime.now())
             )
             _transaction.value = transactionRepository.getTransactionById(txn.id)
+            com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, txn.id)
             com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
         }
     }
@@ -329,6 +330,7 @@ class TransactionDetailViewModel @Inject constructor(
     )
 
     fun loadTransaction(transactionId: Long) {
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, transactionId)
         viewModelScope.launch {
             val transaction = transactionRepository.getTransactionById(transactionId)
             _transaction.value = transaction
@@ -1162,6 +1164,7 @@ class TransactionDetailViewModel @Inject constructor(
                 _pendingReceiptUri.value = null
                 _receiptRemoved.value = false
                 _saveSuccess.value = true
+                com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, normalizedTransaction.id)
                 com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
                 _isEditMode.value = false
                 _editableTransaction.value = null
@@ -1226,6 +1229,7 @@ class TransactionDetailViewModel @Inject constructor(
                     txn.receiptPath?.let { receiptManager.deleteReceipt(it) }
                     deleteTransactionUseCase(txn)
                     _deleteSuccess.value = true
+                    com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, txn.id)
                     com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
                 } catch (e: Exception) {
                     _errorMessage.value = UiText.Res(R.string.txn_detail_error_delete)

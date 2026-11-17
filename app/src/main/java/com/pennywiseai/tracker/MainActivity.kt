@@ -221,8 +221,7 @@ class MainActivity : FragmentActivity() {
             val transactionId = intent.getLongExtra(SmsBroadcastReceiver.EXTRA_TRANSACTION_ID, -1)
             if (transactionId != -1L) {
                 editTransactionId = transactionId
-                // A tapped alert auto-cancels without a callback; recount the stack's header.
-                SmsBroadcastReceiver.updateAlertGroup(this)
+                SmsBroadcastReceiver.dismissTransactionAlert(this, transactionId)
             }
         }
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
