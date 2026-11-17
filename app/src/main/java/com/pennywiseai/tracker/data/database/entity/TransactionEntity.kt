@@ -132,8 +132,26 @@ data class TransactionEntity(
 
     // Shared by the debit and credit marked as one transfer; see utils/TransferPairs.kt.
     @ColumnInfo(name = "transfer_pair_id", defaultValue = "NULL")
-    val transferPairId: String? = null
+    val transferPairId: String? = null,
+
+    // User-assigned transaction-specific display title/name (#Feature F7).
+    // When null or blank, falls back to merchant alias, contact name, then merchantName.
+    @ColumnInfo(name = "title", defaultValue = "NULL")
+    val title: String? = null
 )
+
+/**
+ * Resolves the primary display title for this transaction according to precedence:
+ * 1. User-assigned transaction-specific [title] (Tier 1)
+ * 2. Merchant alias or contact name via [merchantDisplay] (Tier 2 & 3)
+ * 3. Raw [merchantName] (Tier 4)
+ */
+fun TransactionEntity.displayTitle(
+    merchantDisplay: (String?) -> String? = { it }
+): String =
+    title?.trim()?.takeIf { it.isNotEmpty() }
+        ?: merchantDisplay(merchantName)?.takeIf { it.isNotBlank() }
+        ?: merchantName
 
 @Serializable
 enum class BudgetImpactType {

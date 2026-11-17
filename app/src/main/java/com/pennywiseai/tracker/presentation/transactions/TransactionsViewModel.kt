@@ -328,6 +328,7 @@ class TransactionsViewModel @Inject constructor(
                 .associate { it.id to it.category }
             previous.keys.forEach { id ->
                 transactionRepository.updateCategory(id, newCategory)
+                com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, id)
             }
             refreshWidgets()
             clearSelection()
@@ -477,6 +478,7 @@ class TransactionsViewModel @Inject constructor(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             val snapshot = _uiState.value.transactions.filter { it.id in ids }
+            snapshot.forEach { com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, it.id) }
             deleteTransactionUseCase(snapshot)
             refreshWidgets()
             clearSelection()
@@ -913,6 +915,7 @@ class TransactionsViewModel @Inject constructor(
 
     fun updateCategory(transaction: TransactionEntity, newCategory: String) {
         if (transaction.category == newCategory) return
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, transaction.id)
         viewModelScope.launch {
             transactionRepository.updateCategory(transaction.id, newCategory)
         }
@@ -1025,6 +1028,7 @@ class TransactionsViewModel @Inject constructor(
     }
 
     fun deleteTransaction(transaction: TransactionEntity) {
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, transaction.id)
         viewModelScope.launch {
             _deletedTransaction.value = transaction
             deleteTransactionUseCase(transaction)

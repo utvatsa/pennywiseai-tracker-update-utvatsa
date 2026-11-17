@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -42,7 +43,8 @@ internal fun HomeMenuSheet(
     onOpenShareCard: () -> Unit,
     onOpenSettings: () -> Unit,
     onEditHome: () -> Unit,
-    onReadMessagesAgain: () -> Unit
+    onReadMessagesAgain: () -> Unit,
+    onDismissAllNotifications: () -> Unit = {}
 ) {
     // The screen's context, read outside the sheet's own window.
     val context = LocalContext.current
@@ -100,6 +102,17 @@ internal fun HomeMenuSheet(
                 onClick = {
                     onDismiss()
                     onOpenSettings()
+                }
+            )
+
+            // Dismiss open alerts (Middle)
+            MenuListItem(
+                headline = stringResource(R.string.home_menu_dismiss_notifications),
+                icon = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                position = ListItemPosition.Middle,
+                onClick = {
+                    onDismiss()
+                    onDismissAllNotifications()
                 }
             )
 
