@@ -562,6 +562,12 @@ class TransactionDetailViewModel @Inject constructor(
         }
     }
 
+    fun updateTitle(title: String) {
+        _editableTransaction.update { current ->
+            current?.copy(title = title.takeIf { it.isNotBlank() })
+        }
+    }
+
     fun updateMerchantAlias(alias: String) {
         _merchantAlias.value = alias
     }
@@ -1008,6 +1014,7 @@ class TransactionDetailViewModel @Inject constructor(
                     toSave.category
                 }
                 val normalizedTransaction = toSave.copy(
+                    title = toSave.title?.trim()?.takeIf { it.isNotEmpty() },
                     category = primaryCategory,
                     // Keep the user's casing: "IRCTC" stays "IRCTC" (#876).
                     merchantName = toSave.merchantName.trim(),

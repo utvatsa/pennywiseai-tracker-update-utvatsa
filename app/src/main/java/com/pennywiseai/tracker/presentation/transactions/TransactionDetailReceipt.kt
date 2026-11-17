@@ -134,13 +134,13 @@ internal fun TransactionReceipt(
 
                 Spacer(modifier = Modifier.height(Spacing.sm))
 
-                // Prefer the user's saved alias (#583); else the contact-resolved
-                // name when that toggle is on. The raw merchant is still what the
-                // Edit field below renders so users can correct mis-detections.
+                // Prefer the user's transaction title (#Feature F7); else saved alias (#583);
+                // else the contact-resolved name when that toggle is on.
                 val merchantDisplay = LocalMerchantDisplay.current
                 val currentAlias by viewModel.currentMerchantAlias.collectAsStateWithLifecycle()
                 Text(
-                    text = currentAlias
+                    text = transaction.title?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: currentAlias
                         ?: merchantDisplay(transaction.merchantName)
                         ?: transaction.merchantName,
                     style = MaterialTheme.typography.titleLarge,
