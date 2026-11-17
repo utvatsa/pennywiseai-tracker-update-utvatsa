@@ -124,6 +124,26 @@ internal fun EditableTransactionHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(1.5.dp)
         ) {
+            // Transaction-specific display title (#Feature F7):
+            // Shown as the primary heading for THIS transaction across all lists and receipts.
+            TextField(
+                value = transaction.title ?: "",
+                onValueChange = { viewModel.updateTitle(it) },
+                label = { Text(stringResource(R.string.txn_detail_field_title), fontWeight = FontWeight.SemiBold) },
+                placeholder = { Text(stringResource(R.string.txn_detail_field_title_placeholder)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Title,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimensions.Icon.medium)
+                    )
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = editTopShape,
+                colors = editFilledColors()
+            )
+
             TextField(
                 value = transaction.merchantName,
                 onValueChange = { viewModel.updateMerchantName(it) },
@@ -140,7 +160,7 @@ internal fun EditableTransactionHeader(
                 },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = editTopShape,
+                shape = editMiddleShape,
                 isError = transaction.merchantName.isBlank(),
                 colors = editFilledColors()
             )
@@ -303,7 +323,7 @@ internal fun EditableExtractedInfoCard(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(1.5.dp)
         ) {
-            if (transaction.transactionType == TransactionType.TRANSFER) {
+            if (transaction.transactionType == TransactionType.TRANSFER || transaction.transactionType == TransactionType.CC_REPAYMENT) {
                 AccountNumberField(
                     accountNumber = transaction.fromAccount,
                     onAccountNumberChange = { viewModel.updateFromAccount(it) },
@@ -592,4 +612,5 @@ internal fun transactionTypeLabel(type: TransactionType): Int = when (type) {
     TransactionType.CREDIT -> R.string.txn_type_credit
     TransactionType.TRANSFER -> R.string.txn_type_transfer
     TransactionType.INVESTMENT -> R.string.txn_type_investment
+    TransactionType.CC_REPAYMENT -> R.string.txn_type_cc_repayment
 }

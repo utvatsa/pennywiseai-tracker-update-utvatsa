@@ -75,7 +75,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         private const val TAG = "SmsBroadcastReceiver"
         const val ACTION_EDIT_TRANSACTION = "com.pennywiseai.tracker.ACTION_EDIT_TRANSACTION"
         const val EXTRA_TRANSACTION_ID = "transaction_id"
-        const val CHANNEL_ID = "transaction_notifications"
+        const val CHANNEL_ID = "transaction_notifications_v2"
+        private const val LEGACY_CHANNEL_ID = "transaction_notifications"
 
         // Category actions occupy slots 0..1; Not an expense 2 and its Undo 3; "Track as … bill" /
         // "Update price" slot 7; the learned note's Undo slot 8; picker reserves slot 9.
@@ -121,7 +122,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             billAction: Boolean = false
         ): Pair<Int, Boolean> {
             val exclude = !billAction && !alreadyExcluded &&
-                type != TransactionType.TRANSFER && type != TransactionType.INVESTMENT
+                type != TransactionType.TRANSFER && type != TransactionType.INVESTMENT && type != TransactionType.CC_REPAYMENT
             val picks = if (uncategorized) 2 - listOf(billAction, exclude).count { it } else 0
             return picks to exclude
         }
@@ -162,14 +163,51 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
 
         fun ensureChannel(context: Context): NotificationManager {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    context.getString(R.string.notif_txn_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = context.getString(R.string.notif_txn_channel_description) }
-            )
+            runCatching {
+                notificationManager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+            }
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.notif_txn_channel_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.notif_txn_channel_description)
+                enableVibration(true)
+                enableLights(true)
+            }
+            notificationManager.createNotificationChannel(channel)
             return notificationManager
+        }
+
+        /** Dismisses the notification alert for a specific transaction when checked/edited in the app. */
+        fun dismissTransactionAlert(context: Context, transactionId: Long) {
+            if (transactionId <= 0) return
+            val notificationId = transactionId.toInt()
+            val notificationManager = runCatching {
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            }.getOrNull() ?: return
+            runCatching {
+                notificationManager.cancel(notificationId)
+                updateAlertGroup(context, removedId = notificationId)
+            }
+        }
+
+        /** Dismisses all active transaction alerts and group summary for the app. */
+        fun dismissAllTransactionAlerts(context: Context) {
+            val notificationManager = runCatching {
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            }.getOrNull() ?: return
+            runCatching {
+                val active = notificationManager.activeNotifications ?: emptyArray()
+                active.filter {
+                    it.notification.group == GROUP_KEY ||
+                        it.notification.channelId == CHANNEL_ID ||
+                        it.notification.channelId == LEGACY_CHANNEL_ID
+                }.forEach {
+                    notificationManager.cancel(it.tag, it.id)
+                }
+                notificationManager.cancel(GROUP_SUMMARY_ID)
+            }
         }
 
         fun openTransactionIntent(context: Context, transactionId: Long): PendingIntent =
@@ -239,9 +277,11 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             posted: Pair<Int, android.app.Notification>? = null,
             removedId: Int? = null
         ) {
-            syncAlertGroup(context, posted, removedId)
-            val app = context.applicationContext
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ syncAlertGroup(app) }, GROUP_SETTLE_MS)
+            runCatching {
+                syncAlertGroup(context, posted, removedId)
+                val app = context.applicationContext
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ syncAlertGroup(app) }, GROUP_SETTLE_MS)
+            }
         }
 
         private fun syncAlertGroup(
@@ -777,9 +817,6 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             }
                 .onFailure { Log.e(TAG, "Error checking for a repeat charge", it) }
                 .getOrNull()
-            // The open app shows the new row itself, but has nowhere to ask "Track
-            // as … bill?" or "Update price?", so those still get the alert.
-            if (result.priceChange == null && trackCycle == null && isAppInForeground(context)) return
             // Maybe a subscription at a new price: ask, don't apply.
             val priceLine = result.priceChange?.let { change ->
                 context.getString(
@@ -836,7 +873,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             val amountPrefix = when (transaction.transactionType) {
                 TransactionType.INCOME -> "+"
                 TransactionType.EXPENSE, TransactionType.CREDIT, TransactionType.INVESTMENT -> "-"
-                TransactionType.TRANSFER -> ""
+                TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> ""
             }
             val formattedAmount = CurrencyFormatter.formatCurrency(transaction.amount, transaction.currency, maskIfHidden = false)
             val signedAmount = CurrencyFormatter.signed(amountPrefix, formattedAmount)
@@ -848,6 +885,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 TransactionType.EXPENSE -> context.getString(R.string.notif_txn_debit)
                 TransactionType.TRANSFER -> context.getString(R.string.txn_item_tag_transfer)
                 TransactionType.INVESTMENT -> context.getString(R.string.txn_item_tag_investment)
+                TransactionType.CC_REPAYMENT -> context.getString(R.string.txn_item_tag_cc_repayment)
             }
 
             // Title: signed amount + merchant name, resembling a transaction item
@@ -887,7 +925,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 .setContentText(subtitle)
                 .setSubText(typeTag)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(expanded))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setGroup(GROUP_KEY)

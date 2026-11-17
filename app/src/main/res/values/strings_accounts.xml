@@ -28,6 +28,7 @@
     <string name="account_detail_type_credit">Credit</string>
     <string name="account_detail_type_transfer">Transfer</string>
     <string name="account_detail_type_investment">Investment</string>
+    <string name="account_detail_type_cc_repayment">CC Repayment</string>
     <string name="account_detail_range_last_7_days">Last 7 Days</string>
     <string name="account_detail_range_last_30_days">Last 30 Days</string>
     <string name="account_detail_range_last_3_months">Last 3 Months</string>

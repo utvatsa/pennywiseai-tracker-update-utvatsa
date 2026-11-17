@@ -57,7 +57,8 @@
     <!-- Transaction types -->
     <string name="txn_type_income">Income</string>
     <string name="txn_type_expense">Expense</string>
-    <string name="txn_type_credit">Credit</string>
+    <string name="txn_type_credit">Credit Card Spend</string>
+    <string name="txn_type_cc_repayment">Credit Card Repayment</string>
     <string name="txn_type_transfer">Transfer</string>
     <string name="txn_type_investment">Investment</string>
 
@@ -126,9 +127,11 @@
     <string name="txn_detail_sms_hide">Hide SMS</string>
     <string name="txn_detail_sms_show">Show original SMS</string>
     <string name="txn_detail_field_amount">Amount</string>
+    <string name="txn_detail_field_title">Transaction title (Optional)</string>
+    <string name="txn_detail_field_title_placeholder">e.g. Dinner with Alice, Grocery run</string>
     <string name="txn_detail_field_merchant">Merchant</string>
-    <string name="txn_detail_field_alias">Display alias (Optional)</string>
-    <string name="txn_detail_field_alias_placeholder">Show a friendlier name instead</string>
+    <string name="txn_detail_field_alias">Merchant alias (All transactions)</string>
+    <string name="txn_detail_field_alias_placeholder">Rename this merchant everywhere</string>
     <string name="txn_detail_field_description">Description (Optional)</string>
     <string name="txn_detail_field_reference">Reference number (Optional)</string>
     <string name="txn_detail_apply_tags_to_merchant">Apply tags to all future from %1$s</string>

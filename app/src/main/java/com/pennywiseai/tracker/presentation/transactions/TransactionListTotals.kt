@@ -58,6 +58,11 @@ internal fun calculateCurrencyGroupedTotals(transactions: List<TransactionEntity
             .filter { it.transactionType == TransactionType.INVESTMENT }
             .sumOf { it.amount }
 
+        val ccRepayment = currencyTransactions
+            .filter { it.transactionType == TransactionType.CC_REPAYMENT }
+            .countingTransferPairsOnce { it }
+            .sumOf { it.amount }
+
         CurrencyTotals(
             currency = currency,
             income = income,
@@ -65,6 +70,7 @@ internal fun calculateCurrencyGroupedTotals(transactions: List<TransactionEntity
             credit = credit,
             transfer = transfer,
             investment = investment,
+            ccRepayment = ccRepayment,
             transactionCount = currencyTransactions.size
         )
     }
@@ -110,6 +116,7 @@ internal suspend fun resolveFilteredTotals(
         var credit = BigDecimal.ZERO
         var transfer = BigDecimal.ZERO
         var investment = BigDecimal.ZERO
+        var ccRepayment = BigDecimal.ZERO
         var count = 0
         for ((cur, totals) in groupedTotals.totalsByCurrency) {
             if (cur == currency) {
@@ -118,6 +125,7 @@ internal suspend fun resolveFilteredTotals(
                 credit += totals.credit
                 transfer += totals.transfer
                 investment += totals.investment
+                ccRepayment += totals.ccRepayment
             } else {
                 // Skip unconvertible currency pairs (add nothing) rather than
                 // counting face value (#670). The transactions still appear in
@@ -127,6 +135,7 @@ internal suspend fun resolveFilteredTotals(
                 credit += convertOrNull(totals.credit, cur, currency) ?: BigDecimal.ZERO
                 transfer += convertOrNull(totals.transfer, cur, currency) ?: BigDecimal.ZERO
                 investment += convertOrNull(totals.investment, cur, currency) ?: BigDecimal.ZERO
+                ccRepayment += convertOrNull(totals.ccRepayment, cur, currency) ?: BigDecimal.ZERO
             }
             count += totals.transactionCount
         }
@@ -136,7 +145,7 @@ internal suspend fun resolveFilteredTotals(
         // the user-visible math. Those channels live on the home Cash-Flow
         // card as deliberately separate categories.
         val netBalance = income - expenses
-        FilteredTotals(income, expenses, credit, transfer, investment, netBalance, count)
+        FilteredTotals(income, expenses, credit, transfer, investment, ccRepayment, netBalance, count)
     } else {
         val currencyTotals = groupedTotals.getTotalsForCurrency(currency)
         FilteredTotals(
@@ -145,6 +154,7 @@ internal suspend fun resolveFilteredTotals(
             credit = currencyTotals.credit,
             transfer = currencyTotals.transfer,
             investment = currencyTotals.investment,
+            ccRepayment = currencyTotals.ccRepayment,
             netBalance = currencyTotals.netBalance,
             transactionCount = currencyTotals.transactionCount
         )

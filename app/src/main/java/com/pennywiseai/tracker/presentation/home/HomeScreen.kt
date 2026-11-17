@@ -1,6 +1,7 @@
 package com.pennywiseai.tracker.presentation.home
 
 import android.view.HapticFeedbackConstants
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.ReportDrawnWhen
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -133,6 +135,8 @@ fun HomeScreen(
     var showProfileFilterMenu by remember { mutableStateOf(false) }
     val deletedMessage = stringResource(R.string.home_transaction_deleted)
     val undoLabel = stringResource(R.string.home_undo)
+    val context = LocalContext.current
+    val allAlertsDismissedMessage = stringResource(R.string.home_notifications_dismissed)
 
     // Haptic feedback
     val view = LocalView.current
@@ -629,6 +633,7 @@ fun HomeScreen(
                                         // "Spent this month", so drop it from this "outside cash flow"
                                         // card (a zero channel is filtered out) to avoid double-showing.
                                         creditCardSpend = if (uiState.countCreditCardAsExpense) BigDecimal.ZERO else uiState.currentMonthCreditCard,
+                                        ccRepayments = uiState.currentMonthCcRepayment,
                                         investments = uiState.currentMonthInvestment,
                                         transfers = uiState.currentMonthTransfer,
                                         isBalanceHidden = uiState.isBalanceHidden,
@@ -734,7 +739,11 @@ fun HomeScreen(
                 onOpenShareCard = { showShareSheet = true },
                 onOpenSettings = onNavigateToSettings,
                 onEditHome = { showEditWidgetsSheet = true },
-                onReadMessagesAgain = { showFullResyncDialog = true }
+                onReadMessagesAgain = { showFullResyncDialog = true },
+                onDismissAllNotifications = {
+                    viewModel.dismissAllNotifications()
+                    Toast.makeText(context, allAlertsDismissedMessage, Toast.LENGTH_SHORT).show()
+                }
             )
         }
     }

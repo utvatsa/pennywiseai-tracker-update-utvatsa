@@ -37,6 +37,7 @@ import com.pennywiseai.tracker.data.database.entity.ProfileEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionSplitEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
+import com.pennywiseai.tracker.data.database.entity.displayTitle
 import com.pennywiseai.tracker.ui.LocalNavAnimatedVisibilityScope
 import com.pennywiseai.tracker.ui.LocalSharedTransitionScope
 import com.pennywiseai.tracker.ui.components.BrandIcon
@@ -80,7 +81,7 @@ fun TransactionItem(
             ?.takeIf { it.isSpecified }
             ?: colorScheme.onSurface
         TransactionType.CREDIT -> colorScheme.credit
-        TransactionType.TRANSFER -> colorScheme.transfer
+        TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> colorScheme.transfer
         TransactionType.INVESTMENT -> colorScheme.investment
     }
 
@@ -153,6 +154,7 @@ fun TransactionItem(
                             add(resources.getString(R.string.txn_item_tag_transfer))
                         }
                     }
+                    TransactionType.CC_REPAYMENT -> add(resources.getString(R.string.txn_item_tag_cc_repayment))
                     TransactionType.INVESTMENT -> add(resources.getString(R.string.txn_item_tag_investment))
                     else -> {}
                 }
@@ -172,7 +174,7 @@ fun TransactionItem(
         when (transaction.transactionType) {
             TransactionType.INCOME -> "+"
             TransactionType.EXPENSE, TransactionType.CREDIT, TransactionType.INVESTMENT -> "-"
-            TransactionType.TRANSFER -> ""
+            TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> ""
         }
     }
 
@@ -193,7 +195,7 @@ fun TransactionItem(
     val transferTitle = transferTitleOverride(transaction, resources)
 
     ListItemCardV2(
-        title = transferTitle ?: merchantDisplay(transaction.merchantName) ?: transaction.merchantName,
+        title = transferTitle ?: transaction.displayTitle(merchantDisplay),
         subtitle = subtitle,
         amount = CurrencyFormatter.signed(amountPrefix, formattedAmount),
         amountColor = amountColor,

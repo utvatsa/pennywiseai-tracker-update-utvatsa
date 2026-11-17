@@ -29,7 +29,7 @@ data class BalanceDiscrepancy(
          * paired legs included, by type. Mirrors what the ledger itself applies.
          */
         fun effectOn(tx: TransactionEntity, accountLast4: String): BigDecimal = when (val type = tx.ledgerType()) {
-            TransactionType.TRANSFER -> when {
+            TransactionType.TRANSFER, TransactionType.CC_REPAYMENT -> when {
                 tx.toAccount == accountLast4 && tx.fromAccount != accountLast4 ->
                     BalanceCalculator.transferLegEffect(isCreditCard = false, incoming = true, amount = tx.amount)
                 tx.fromAccount == accountLast4 && tx.toAccount != accountLast4 ->

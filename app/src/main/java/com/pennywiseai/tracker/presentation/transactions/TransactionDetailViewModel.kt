@@ -252,6 +252,7 @@ class TransactionDetailViewModel @Inject constructor(
                 txn.copy(excludedFromAnalytics = excluded, updatedAt = LocalDateTime.now())
             )
             _transaction.value = transactionRepository.getTransactionById(txn.id)
+            com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, txn.id)
             com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
         }
     }
@@ -329,6 +330,7 @@ class TransactionDetailViewModel @Inject constructor(
     )
 
     fun loadTransaction(transactionId: Long) {
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, transactionId)
         viewModelScope.launch {
             val transaction = transactionRepository.getTransactionById(transactionId)
             _transaction.value = transaction
@@ -559,6 +561,12 @@ class TransactionDetailViewModel @Inject constructor(
             ruleRepository.updateRule(
                 existing.copy(actions = existing.actions + missing, updatedAt = System.currentTimeMillis())
             )
+        }
+    }
+
+    fun updateTitle(title: String) {
+        _editableTransaction.update { current ->
+            current?.copy(title = title.takeIf { it.isNotBlank() })
         }
     }
 
@@ -926,8 +934,8 @@ class TransactionDetailViewModel @Inject constructor(
             return
         }
 
-        // Validate self-transfer for TRANSFER transactions
-        if (toSave.transactionType == TransactionType.TRANSFER &&
+        // Validate self-transfer for TRANSFER and CC_REPAYMENT transactions
+        if ((toSave.transactionType == TransactionType.TRANSFER || toSave.transactionType == TransactionType.CC_REPAYMENT) &&
             toSave.fromAccount != null &&
             toSave.toAccount != null &&
             toSave.fromAccount == toSave.toAccount &&
@@ -1008,6 +1016,7 @@ class TransactionDetailViewModel @Inject constructor(
                     toSave.category
                 }
                 val normalizedTransaction = toSave.copy(
+                    title = toSave.title?.trim()?.takeIf { it.isNotEmpty() },
                     category = primaryCategory,
                     // Keep the user's casing: "IRCTC" stays "IRCTC" (#876).
                     merchantName = toSave.merchantName.trim(),
@@ -1155,6 +1164,7 @@ class TransactionDetailViewModel @Inject constructor(
                 _pendingReceiptUri.value = null
                 _receiptRemoved.value = false
                 _saveSuccess.value = true
+                com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, normalizedTransaction.id)
                 com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
                 _isEditMode.value = false
                 _editableTransaction.value = null
@@ -1219,6 +1229,7 @@ class TransactionDetailViewModel @Inject constructor(
                     txn.receiptPath?.let { receiptManager.deleteReceipt(it) }
                     deleteTransactionUseCase(txn)
                     _deleteSuccess.value = true
+                    com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissTransactionAlert(context, txn.id)
                     com.pennywiseai.tracker.widget.WidgetRefresher.refreshTransactionWidgets(context)
                 } catch (e: Exception) {
                     _errorMessage.value = UiText.Res(R.string.txn_detail_error_delete)

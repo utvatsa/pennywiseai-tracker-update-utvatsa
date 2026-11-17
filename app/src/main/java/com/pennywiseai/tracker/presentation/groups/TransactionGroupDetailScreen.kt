@@ -1,9 +1,5 @@
 package com.pennywiseai.tracker.presentation.groups
 
-import com.pennywiseai.tracker.utils.AppDates
-
-import com.pennywiseai.tracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.data.database.entity.TransactionEntity
 import com.pennywiseai.tracker.data.database.entity.TransactionType
 import com.pennywiseai.tracker.presentation.transactions.ExportTransactionsDialog
@@ -34,6 +32,7 @@ import com.pennywiseai.tracker.ui.effects.overScrollVertical
 import com.pennywiseai.tracker.ui.effects.rememberOverscrollFlingBehavior
 import com.pennywiseai.tracker.ui.theme.*
 import com.pennywiseai.tracker.ui.theme.investment
+import com.pennywiseai.tracker.utils.AppDates
 import com.pennywiseai.tracker.utils.CurrencyFormatter
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -367,18 +366,21 @@ private fun GroupTransactionItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Prefer the user-written description as the heading; fall back to the
+            // Prefer the user-written title (#Feature F7) or description as the heading; fall back to the
             // (often cryptic) merchant name. (#383)
             val description = transaction.description?.takeIf { it.isNotBlank() }
+            val heading = transaction.title?.takeIf { it.isNotBlank() }
+                ?: description?.let(CurrencyFormatter::maskAmountsIn)
+                ?: transaction.merchantName
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    description?.let(CurrencyFormatter::maskAmountsIn) ?: transaction.merchantName,
+                    heading,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 val secondary = buildString {
-                    if (description != null) {
+                    if (heading != transaction.merchantName) {
                         append(transaction.merchantName)
                         append(" · ")
                     }
@@ -493,19 +495,22 @@ private fun AddTransactionToGroupSheet(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Match the description-first heading used on the group's
+                                // Match the title/description-first heading used on the group's
                                 // own rows so the picker label is consistent with what
-                                // the user will see once the txn is added. (#383)
+                                // the user will see once the txn is added. (#383, #Feature F7)
                                 val txnDescription = txn.description?.takeIf { it.isNotBlank() }
+                                val pickerHeading = txn.title?.takeIf { it.isNotBlank() }
+                                    ?: txnDescription?.let(CurrencyFormatter::maskAmountsIn)
+                                    ?: txn.merchantName
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        txnDescription?.let(CurrencyFormatter::maskAmountsIn) ?: txn.merchantName,
+                                        pickerHeading,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     val pickerSecondary = buildString {
-                                        if (txnDescription != null) {
+                                        if (pickerHeading != txn.merchantName) {
                                             append(txn.merchantName)
                                             append(" · ")
                                         }

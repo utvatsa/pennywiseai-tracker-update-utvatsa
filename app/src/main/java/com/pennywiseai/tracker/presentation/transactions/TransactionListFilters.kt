@@ -47,15 +47,17 @@ internal fun filterBySearch(
 }
 
 /**
- * Whether [query] appears, ignoring case, in this row's merchant, description, reference,
- * [tags], the merchant's user-set [merchantAlias] (#691) or SMS body, or in its amount.
+ * Whether [query] appears, ignoring case, in this row's title (#Feature F7), merchant,
+ * description, reference, [tags], the merchant's user-set [merchantAlias] (#691) or SMS body,
+ * or in its amount.
  */
 internal fun TransactionEntity.matchesSearch(
     query: String,
     tags: List<String>?,
     merchantAlias: String?,
 ): Boolean =
-    merchantName.contains(query, ignoreCase = true) ||
+    title?.contains(query, ignoreCase = true) == true ||
+        merchantName.contains(query, ignoreCase = true) ||
         description?.contains(query, ignoreCase = true) == true ||
         reference?.contains(query, ignoreCase = true) == true ||
         tags?.any { it.contains(query, ignoreCase = true) } == true ||

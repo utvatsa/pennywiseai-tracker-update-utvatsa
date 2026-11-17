@@ -1,19 +1,20 @@
 package com.pennywiseai.tracker.presentation.common
 
 import androidx.annotation.StringRes
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
-import com.pennywiseai.tracker.R
-import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import com.pennywiseai.tracker.R
 import com.pennywiseai.tracker.domain.model.TransactionTypeFilter
 
 @get:StringRes
@@ -24,6 +25,7 @@ val TransactionTypeFilter.labelRes: Int
         TransactionTypeFilter.EXPENSE -> R.string.filter_type_expense
         TransactionTypeFilter.CREDIT -> R.string.filter_type_credit
         TransactionTypeFilter.SPENDING -> R.string.filter_type_spending
+        TransactionTypeFilter.CC_REPAYMENT -> R.string.filter_type_cc_repayment
         TransactionTypeFilter.TRANSFER -> R.string.filter_type_transfer
         TransactionTypeFilter.INVESTMENT -> R.string.filter_type_investment
     }
@@ -39,6 +41,7 @@ fun TransactionTypeFilter.shortLabel(): String = stringResource(
         TransactionTypeFilter.EXPENSE -> R.string.type_filter_expense
         TransactionTypeFilter.CREDIT -> R.string.type_filter_credit
         TransactionTypeFilter.SPENDING -> R.string.type_filter_spending
+        TransactionTypeFilter.CC_REPAYMENT -> R.string.type_filter_cc_repayment
         TransactionTypeFilter.TRANSFER -> R.string.type_filter_transfer
         TransactionTypeFilter.INVESTMENT -> R.string.type_filter_investment
     }
@@ -50,6 +53,7 @@ fun TransactionTypeFilter.filterIcon(): ImageVector = when (this) {
     TransactionTypeFilter.EXPENSE -> Icons.AutoMirrored.Filled.TrendingDown
     TransactionTypeFilter.CREDIT -> Icons.Default.CreditCard
     TransactionTypeFilter.SPENDING -> Icons.Default.ShoppingCart
+    TransactionTypeFilter.CC_REPAYMENT -> Icons.Default.Payments
     TransactionTypeFilter.TRANSFER -> Icons.Default.SwapHoriz
     TransactionTypeFilter.INVESTMENT -> Icons.AutoMirrored.Filled.ShowChart
 }

@@ -169,6 +169,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /** Dismisses all open transaction notifications across the app. */
+    fun dismissAllNotifications() {
+        com.pennywiseai.tracker.receiver.SmsBroadcastReceiver.dismissAllTransactionAlerts(context)
+    }
+
     /**
      * The user's current budget cycle window (start, end). Recomputed whenever
      * the start day pref changes — used everywhere the home surface used to
@@ -1465,7 +1470,8 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     currentMonthCreditCard = motion.credit,
                     currentMonthTransfer = motion.transfer,
-                    currentMonthInvestment = motion.investment
+                    currentMonthInvestment = motion.investment,
+                    currentMonthCcRepayment = motion.ccRepayment
                 )
             }
         } else {
@@ -1474,7 +1480,8 @@ class HomeViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 currentMonthCreditCard = motion.credit,
                 currentMonthTransfer = motion.transfer,
-                currentMonthInvestment = motion.investment
+                currentMonthInvestment = motion.investment,
+                currentMonthCcRepayment = motion.ccRepayment
             )
         }
     }
@@ -1666,6 +1673,7 @@ data class HomeUiState(
     val countCreditCardAsExpense: Boolean = false,
     val currentMonthTransfer: BigDecimal = BigDecimal.ZERO,
     val currentMonthInvestment: BigDecimal = BigDecimal.ZERO,
+    val currentMonthCcRepayment: BigDecimal = BigDecimal.ZERO,
     val lastMonthTotal: BigDecimal = BigDecimal.ZERO,
     val lastMonthIncome: BigDecimal = BigDecimal.ZERO,
     val lastMonthExpenses: BigDecimal = BigDecimal.ZERO,

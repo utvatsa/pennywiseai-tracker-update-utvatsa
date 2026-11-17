@@ -4,10 +4,10 @@ import androidx.room3.ColumnInfo
 import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
-import java.math.BigDecimal
-import java.time.LocalDateTime
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Entity(
     tableName = "transactions",
@@ -18,49 +18,49 @@ data class TransactionEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
     val id: Long = 0,
-    
+
     @ColumnInfo(name = "amount")
     @Contextual
     val amount: BigDecimal,
-    
+
     @ColumnInfo(name = "merchant_name")
     val merchantName: String,
-    
+
     @ColumnInfo(name = "category")
     val category: String,
-    
+
     @ColumnInfo(name = "transaction_type")
     val transactionType: TransactionType,
-    
+
     @ColumnInfo(name = "date_time")
     @Contextual
     val dateTime: LocalDateTime,
-    
+
     @ColumnInfo(name = "description")
     val description: String? = null,
-    
+
     @ColumnInfo(name = "sms_body")
     val smsBody: String? = null,
-    
+
     @ColumnInfo(name = "bank_name")
     val bankName: String? = null,
-    
+
     @ColumnInfo(name = "sms_sender")
     val smsSender: String? = null,
-    
+
     @ColumnInfo(name = "account_number")
     val accountNumber: String? = null,
-    
+
     @ColumnInfo(name = "balance_after")
     @Contextual
     val balanceAfter: BigDecimal? = null,
-    
+
     @ColumnInfo(name = "transaction_hash", defaultValue = "")
     val transactionHash: String,
-    
+
     @ColumnInfo(name = "is_recurring")
     val isRecurring: Boolean = false,
-    
+
     @ColumnInfo(name = "is_deleted", defaultValue = "0")
     val isDeleted: Boolean = false,
 
@@ -132,8 +132,26 @@ data class TransactionEntity(
 
     // Shared by the debit and credit marked as one transfer; see utils/TransferPairs.kt.
     @ColumnInfo(name = "transfer_pair_id", defaultValue = "NULL")
-    val transferPairId: String? = null
+    val transferPairId: String? = null,
+
+    // User-assigned transaction-specific display title/name (#Feature F7).
+    // When null or blank, falls back to merchant alias, contact name, then merchantName.
+    @ColumnInfo(name = "title", defaultValue = "NULL")
+    val title: String? = null
 )
+
+/**
+ * Resolves the primary display title for this transaction according to precedence:
+ * 1. User-assigned transaction-specific [title] (Tier 1)
+ * 2. Merchant alias or contact name via [merchantDisplay] (Tier 2 & 3)
+ * 3. Raw [merchantName] (Tier 4)
+ */
+fun TransactionEntity.displayTitle(
+    merchantDisplay: (String?) -> String? = { it }
+): String =
+    title?.trim()?.takeIf { it.isNotEmpty() }
+        ?: merchantDisplay(merchantName)?.takeIf { it.isNotBlank() }
+        ?: merchantName
 
 @Serializable
 enum class BudgetImpactType {
@@ -143,9 +161,10 @@ enum class BudgetImpactType {
 
 @Serializable
 enum class TransactionType {
-    INCOME,     // Money received
-    EXPENSE,    // Money spent from accounts
-    CREDIT,     // Credit card purchases
-    TRANSFER,   // Between own accounts
-    INVESTMENT  // Mutual funds, stocks, etc.
+    INCOME,       // Money received
+    EXPENSE,      // Money spent from accounts
+    CREDIT,       // Credit card purchases
+    TRANSFER,     // Between own accounts
+    INVESTMENT,   // Mutual funds, stocks, etc.
+    CC_REPAYMENT  // Credit card bill payments
 }

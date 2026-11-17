@@ -273,6 +273,37 @@ class BalanceCalculatorTest {
     }
 
     @Test
+    fun `credit card cc repayment transaction subtracts from outstanding balance`() {
+        val newBalance = BalanceCalculator.calculateNewBalance(
+            explicitBalance = null,
+            isCreditCard = true,
+            transactionType = TransactionType.CC_REPAYMENT,
+            transactionAmount = BigDecimal("30.00"),
+            currentBalance = BigDecimal("100.00")
+        )
+        assertEquals(BigDecimal("70.00"), newBalance)
+    }
+
+    @Test
+    fun `debit cc repayment transaction subtracts from standard account balance`() {
+        val newBalance = BalanceCalculator.calculateNewBalance(
+            explicitBalance = null,
+            isCreditCard = false,
+            transactionType = TransactionType.CC_REPAYMENT,
+            transactionAmount = BigDecimal("50.00"),
+            currentBalance = BigDecimal("200.00")
+        )
+        assertEquals(BigDecimal("150.00"), newBalance)
+    }
+
+    @Test
+    fun `signedBalanceEffect for cc repayment is zero because balance moves through legs`() {
+        val amount = BigDecimal("150.00")
+        assertEquals(BigDecimal.ZERO, BalanceCalculator.signedBalanceEffect(false, TransactionType.CC_REPAYMENT, amount))
+        assertEquals(BigDecimal.ZERO, BalanceCalculator.signedBalanceEffect(true, TransactionType.CC_REPAYMENT, amount))
+    }
+
+    @Test
     fun `unanchoredAccounts flags only accounts whose rows are all transaction deltas`() {
         fun row(acct: String, source: String?, stated: Boolean?) = BalanceSourceRow("Bank", acct, source, stated)
         val rows = listOf(

@@ -18,6 +18,7 @@ class TransactionSearchTest {
         description: String? = null,
         reference: String? = null,
         smsBody: String? = null,
+        title: String? = null,
     ) = TransactionEntity(
         id = id,
         amount = BigDecimal(amount),
@@ -29,6 +30,7 @@ class TransactionSearchTest {
         description = description,
         reference = reference,
         smsBody = smsBody,
+        title = title,
     )
 
     private fun matches(
@@ -37,6 +39,13 @@ class TransactionSearchTest {
         tags: Map<Long, List<String>> = emptyMap(),
         aliases: Map<String, String> = emptyMap(),
     ) = filterBySearch(listOf(row), query, tags, aliases).isNotEmpty()
+
+    @Test
+    fun `title matches partially and ignores case`() {
+        assertTrue(matches("dentist", tx(title = "Annual Dentist Checkup")))
+        assertTrue(matches("DENTIST", tx(title = "Annual Dentist Checkup")))
+        assertFalse(matches("hospital", tx(title = "Annual Dentist Checkup")))
+    }
 
     @Test
     fun `merchant matches partially and ignores case`() {
