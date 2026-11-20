@@ -144,9 +144,20 @@ class AnalyticsViewModel @Inject constructor(
     private val _categoryFilter = MutableStateFlow<String?>(null)
     val categoryFilter: StateFlow<String?> = _categoryFilter.asStateFlow()
 
+    private val _categoriesFilter = MutableStateFlow<List<String>?>(null)
+    val categoriesFilter: StateFlow<List<String>?> = _categoriesFilter.asStateFlow()
+
+    /** Child category name → parent category name map for hierarchical grouping and indentation. */
+    val categoryParentOf: StateFlow<Map<String, String>> = categoryRepository.getAllCategories()
+        .map { it.parentNameOf() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     // Account filter — null means "All accounts". Key is "bankName_accountLast4".
     private val _accountFilter = MutableStateFlow<String?>(null)
     val accountFilter: StateFlow<String?> = _accountFilter.asStateFlow()
+
+    private val _accountsFilter = MutableStateFlow<List<String>?>(null)
+    val accountsFilter: StateFlow<List<String>?> = _accountsFilter.asStateFlow()
 
     // Pickable account options for the account filter dropdown (alias-preferred labels).
     val accountOptions: StateFlow<List<AccountOption>> =
@@ -238,19 +249,27 @@ class AnalyticsViewModel @Inject constructor(
         customDateRange,
         transactionTypeFilter,
         _selectedCurrency,
-        combine(_isUnifiedMode, _categoryFilter, selectedProfileId, _accountFilter) { u, c, p, a ->
-            UnifiedCatProfileAccount(u, c, p, a)
+        combine(
+            _isUnifiedMode,
+            _categoryFilter,
+            _categoriesFilter,
+            selectedProfileId,
+            combine(_accountFilter, _accountsFilter) { a, accs -> a to accs }
+        ) { u, c, cats, p, (a, accs) ->
+            UnifiedFilterInputs(u, c, cats, p, a, accs)
         }
     ) { period, customRange, typeFilter, currency, extra ->
         FilterState(
-            period,
-            customRange,
-            typeFilter,
-            currency,
-            extra.isUnified,
-            extra.categoryFilter,
-            extra.profileId,
-            extra.accountFilter
+            period = period,
+            customRange = customRange,
+            typeFilter = typeFilter,
+            currency = currency,
+            isUnifiedMode = extra.isUnified,
+            categoryFilter = extra.categoryFilter,
+            categoriesFilter = extra.categoriesFilter,
+            profileId = extra.profileId,
+            accountFilter = extra.accountFilter,
+            accountsFilter = extra.accountsFilter
         )
     }.combine(accountBalanceRepository.getAllLatestBalances()) { fs, balances ->
         fs to balances
@@ -265,7 +284,9 @@ class AnalyticsViewModel @Inject constructor(
         // on a sub-category itself: then the row should be that leaf, not its parent.
         // Only the selected sub-category is exempt; other children (e.g. the
         // Groceries half of a Coffee/Groceries split) still roll into their parent.
-        val parentOf = catIndex.parentOf - listOfNotNull(filterState.categoryFilter)
+        val effectiveCategories = filterState.categoriesFilter
+            ?: filterState.categoryFilter?.let { listOf(it) }
+        val parentOf = catIndex.parentOf - (effectiveCategories ?: emptyList()).toSet()
         // Determine date range based on selected period. The two "month"
         // periods are special: they follow the user's custom budget cycle
         // (e.g. 25th → 24th) instead of the calendar month, so the analytics
@@ -306,12 +327,18 @@ class AnalyticsViewModel @Inject constructor(
                     profileKeys
                 ).mapTo(HashSet()) { it.id }
                 val accountKey = filterState.accountFilter
+                val accountsFilter = filterState.accountsFilter
                 return txs.filter { tw ->
                     val txAccountKey =
                         "${tw.transaction.bankName}_${tw.transaction.accountNumber}"
+                    val matchesAccount = when {
+                        accountsFilter != null -> txAccountKey in accountsFilter
+                        !accountKey.isNullOrBlank() -> txAccountKey == accountKey
+                        else -> true
+                    }
                     tw.transaction.id in keptIds &&
                         txAccountKey !in hidden &&
-                        (accountKey.isNullOrBlank() || txAccountKey == accountKey)
+                        matchesAccount
                 }
             }
 
@@ -361,7 +388,9 @@ class AnalyticsViewModel @Inject constructor(
 
                 // Apply category filter
                 // A parent category filter includes its sub-categories (#374).
-                val categoryFilterSet = filterState.categoryFilter?.let { catIndex.all.expandWithChildren(listOf(it)) }
+                val effectiveCategories = filterState.categoriesFilter
+                    ?: filterState.categoryFilter?.let { listOf(it) }
+                val categoryFilterSet = effectiveCategories?.let { catIndex.all.expandWithChildren(it) }
                 val categoryFilteredWithSplits = categoryFilterSet?.let { set ->
                     filteredTransactionsWithSplits.filter { txWithSplits ->
                         txWithSplits.getAmountByCategory().keys
@@ -695,15 +724,87 @@ class AnalyticsViewModel @Inject constructor(
 
     fun setCategoryFilter(category: String) {
         _categoryFilter.value = category
+        _categoriesFilter.value = null
     }
 
     fun clearCategoryFilter() {
         _categoryFilter.value = null
+        _categoriesFilter.value = null
+    }
+
+    /**
+     * Toggles select-all for categories. If currently all categories are selected
+     * (or filter is null), unselects all (empty list). Otherwise selects all (null).
+     */
+    fun toggleAllCategories(available: List<String>) {
+        val current = _categoriesFilter.value
+            ?: _categoryFilter.value?.let { listOf(it) }
+            ?: available
+        val allSelected = current.toSet() == available.toSet()
+        _categoryFilter.value = null
+        _categoriesFilter.value = if (allSelected) emptyList() else null
+    }
+
+    /**
+     * Include/exclude one category in the analytics filter. The effective
+     * selection starts as "everything available"; unticking narrows it, and
+     * ticking the last one back returns to no filter. Unticking all keeps
+     * an empty selection (None).
+     */
+    fun toggleCategory(category: String, available: List<String>) {
+        val current = _categoriesFilter.value
+            ?: _categoryFilter.value?.let { listOf(it) }
+            ?: available
+        val next = if (category in current) current - category else current + category
+        _categoryFilter.value = null
+        _categoriesFilter.value = when {
+            next.isEmpty() -> emptyList()
+            next.toSet() == available.toSet() -> null
+            else -> next.filter { it in available }
+        }
     }
 
     /** Sets the account filter; null clears it ("All accounts"). */
     fun setAccountFilter(accountKey: String?) {
         _accountFilter.value = accountKey
+        _accountsFilter.value = null
+    }
+
+    fun clearAccountFilter() {
+        _accountFilter.value = null
+        _accountsFilter.value = null
+    }
+
+    /**
+     * Toggles select-all for accounts. If currently all accounts are selected
+     * (or filter is null), unselects all (empty list). Otherwise selects all (null).
+     */
+    fun toggleAllAccounts(availableKeys: List<String>) {
+        val current = _accountsFilter.value
+            ?: _accountFilter.value?.let { listOf(it) }
+            ?: availableKeys
+        val allSelected = current.toSet() == availableKeys.toSet()
+        _accountFilter.value = null
+        _accountsFilter.value = if (allSelected) emptyList() else null
+    }
+
+    /**
+     * Include/exclude one account in the analytics filter. The effective
+     * selection starts as "everything available"; unticking narrows it, and
+     * ticking the last one back returns to no filter. Unticking all keeps
+     * an empty selection (None).
+     */
+    fun toggleAccount(accountKey: String, availableKeys: List<String>) {
+        val current = _accountsFilter.value
+            ?: _accountFilter.value?.let { listOf(it) }
+            ?: availableKeys
+        val next = if (accountKey in current) current - accountKey else current + accountKey
+        _accountFilter.value = null
+        _accountsFilter.value = when {
+            next.isEmpty() -> emptyList()
+            next.toSet() == availableKeys.toSet() -> null
+            else -> next.filter { it in availableKeys }
+        }
     }
 
     fun setChartType(type: ChartType) {
@@ -865,19 +966,23 @@ private data class FilterState(
     val currency: String,
     val isUnifiedMode: Boolean = false,
     val categoryFilter: String? = null,
+    val categoriesFilter: List<String>? = null,
     val profileId: Long? = null,
-    val accountFilter: String? = null
+    val accountFilter: String? = null,
+    val accountsFilter: List<String>? = null
 )
 
 /**
  * Helper tuple for combining the unified-mode, category, profile, and account
  * filter flows (Kotlin's [combine] caps at a small arity).
  */
-private data class UnifiedCatProfileAccount(
+private data class UnifiedFilterInputs(
     val isUnified: Boolean,
     val categoryFilter: String?,
+    val categoriesFilter: List<String>?,
     val profileId: Long?,
-    val accountFilter: String?
+    val accountFilter: String?,
+    val accountsFilter: List<String>?
 )
 
 data class AnalyticsUiState(
