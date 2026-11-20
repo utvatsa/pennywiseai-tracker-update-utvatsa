@@ -33,9 +33,20 @@
     <string name="analytics_filter_all_profiles">All Accounts</string>
     <string name="analytics_filter_currency">Currency</string>
     <string name="analytics_filter_category">Category</string>
+    <string name="analytics_filter_category_all">Category: All</string>
+    <string name="analytics_filter_category_none">Category: None</string>
+    <string name="analytics_filter_category_custom">Category: Custom</string>
     <string name="analytics_filter_all_categories">All categories</string>
     <string name="analytics_filter_account">Account</string>
+    <string name="analytics_filter_account_all">Account: All</string>
+    <string name="analytics_filter_account_none">Account: None</string>
+    <string name="analytics_filter_account_custom">Account: Custom</string>
     <string name="analytics_filter_all_accounts">All accounts</string>
+    <string name="analytics_filter_accounts_all_except">All except %1$s</string>
+    <plurals name="analytics_filter_accounts_count">
+        <item quantity="one">%1$d account</item>
+        <item quantity="other">%1$d accounts</item>
+    </plurals>
 
     <!-- List rows -->
     <plurals name="analytics_transaction_count">

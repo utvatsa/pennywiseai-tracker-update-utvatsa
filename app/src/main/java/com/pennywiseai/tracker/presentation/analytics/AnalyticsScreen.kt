@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
@@ -35,6 +37,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pennywiseai.tracker.R
@@ -100,9 +103,12 @@ fun AnalyticsScreen(
     val isUnifiedMode by viewModel.isUnifiedMode.collectAsStateWithLifecycle()
     val chartType by viewModel.selectedChartType.collectAsStateWithLifecycle()
     val categoryFilter by viewModel.categoryFilter.collectAsStateWithLifecycle()
+    val categoriesFilter by viewModel.categoriesFilter.collectAsStateWithLifecycle()
+    val categoryParentOf by viewModel.categoryParentOf.collectAsStateWithLifecycle()
     val selectedProfileId by viewModel.selectedProfileId.collectAsStateWithLifecycle()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val accountFilter by viewModel.accountFilter.collectAsStateWithLifecycle()
+    val accountsFilter by viewModel.accountsFilter.collectAsStateWithLifecycle()
     val accountOptions by viewModel.accountOptions.collectAsStateWithLifecycle()
     val isProEntitled by viewModel.isProEntitled.collectAsStateWithLifecycle()
     val groupBy by viewModel.groupBy.collectAsStateWithLifecycle()
@@ -156,11 +162,13 @@ fun AnalyticsScreen(
         availableCurrencies.size > 1 &&
         selectedCurrency.isNotBlank() &&
         !selectedCurrency.equals(primaryVisibleCurrency, ignoreCase = true)
+    val isCategoryFiltered = categoryFilter != null || (categoriesFilter != null && uiState.availableCategories.isNotEmpty() && categoriesFilter?.size != uiState.availableCategories.size)
+    val isAccountFiltered = accountFilter != null || (accountsFilter != null && accountOptions.isNotEmpty() && accountsFilter?.size != accountOptions.size)
     val hasActiveAnalyticsFilter = selectedPeriod != TimePeriod.THIS_MONTH ||
         customDateRange != null ||
         transactionTypeFilter != defaultTypeFilter ||
-        categoryFilter != null ||
-        accountFilter != null ||
+        isCategoryFiltered ||
+        isAccountFiltered ||
         hasCurrencyFilter
 
     // Scroll behaviors for collapsible TopAppBar
@@ -211,11 +219,14 @@ fun AnalyticsScreen(
                     availableCurrencies = availableCurrencies,
                     isUnifiedMode = isUnifiedMode,
                     categoryFilter = categoryFilter,
+                    categoriesFilter = categoriesFilter,
                     availableCategories = uiState.availableCategories,
+                    categoryParentOf = categoryParentOf,
                     profiles = profiles,
                     selectedProfileId = selectedProfileId,
                     accountOptions = accountOptions,
                     accountFilter = accountFilter,
+                    accountsFilter = accountsFilter,
                     groupBy = groupBy,
                     isProEntitled = isProEntitled,
                     showGroupByMenu = showGroupByMenu,
@@ -269,6 +280,12 @@ fun AnalyticsScreen(
                         }
                         showCategoryMenu = false
                     },
+                    onToggleAllCategories = {
+                        viewModel.toggleAllCategories(uiState.availableCategories)
+                    },
+                    onCategoryToggled = { category ->
+                        viewModel.toggleCategory(category, uiState.availableCategories)
+                    },
                     onProfileClick = { showProfileMenu = true },
                     onProfileDismiss = { showProfileMenu = false },
                     onProfileSelected = { profileId ->
@@ -280,6 +297,12 @@ fun AnalyticsScreen(
                     onAccountSelected = { accountKey ->
                         viewModel.setAccountFilter(accountKey)
                         showAccountMenu = false
+                    },
+                    onToggleAllAccounts = {
+                        viewModel.toggleAllAccounts(accountOptions.map { it.key })
+                    },
+                    onAccountToggled = { accountKey ->
+                        viewModel.toggleAccount(accountKey, accountOptions.map { it.key })
                     },
                     onResetFilters = {
                         viewModel.selectPeriod(TimePeriod.THIS_MONTH)
@@ -697,11 +720,14 @@ private fun AnalyticsFilterBar(
     availableCurrencies: List<String>,
     isUnifiedMode: Boolean,
     categoryFilter: String?,
+    categoriesFilter: List<String>? = null,
     availableCategories: List<String>,
+    categoryParentOf: Map<String, String> = emptyMap(),
     profiles: List<ProfileEntity>,
     selectedProfileId: Long?,
     accountOptions: List<com.pennywiseai.tracker.presentation.common.AccountOption>,
     accountFilter: String?,
+    accountsFilter: List<String>? = null,
     groupBy: AnalyticsGroupBy,
     isProEntitled: Boolean,
     showGroupByMenu: Boolean,
@@ -727,12 +753,16 @@ private fun AnalyticsFilterBar(
     onCategoryClick: () -> Unit,
     onCategoryDismiss: () -> Unit,
     onCategorySelected: (String?) -> Unit,
+    onToggleAllCategories: () -> Unit = {},
+    onCategoryToggled: (String) -> Unit = {},
     onProfileClick: () -> Unit,
     onProfileDismiss: () -> Unit,
     onProfileSelected: (Long?) -> Unit,
     onAccountClick: () -> Unit,
     onAccountDismiss: () -> Unit,
     onAccountSelected: (String?) -> Unit,
+    onToggleAllAccounts: () -> Unit = {},
+    onAccountToggled: (String) -> Unit = {},
     onResetFilters: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -926,14 +956,21 @@ private fun AnalyticsFilterBar(
             }
         }
 
-        if (availableCategories.isNotEmpty() || categoryFilter != null) {
+        if (availableCategories.isNotEmpty() || categoryFilter != null || categoriesFilter != null) {
             item {
+                val selectedCategories = categoriesFilter?.toSet()
+                    ?: categoryFilter?.let { setOf(it) }
+                    ?: availableCategories.toSet()
+                val isAllSelected = availableCategories.isNotEmpty() && selectedCategories.size == availableCategories.size && categoryFilter == null
+                val hasCatFilter = !isAllSelected
+                val catLabel = categoryFilterChipLabel(categoryFilter, categoriesFilter, availableCategories)
+
                 Box {
                     ExpressiveFilterChip(
                         colors = analyticsFilterChipColors(),
-                        border = analyticsFilterChipBorder(selected = categoryFilter != null),
-                        selected = categoryFilter != null,
-                        text = categoryFilter?.let { categoryLabel(it) } ?: stringResource(R.string.analytics_filter_category),
+                        border = analyticsFilterChipBorder(selected = hasCatFilter),
+                        selected = hasCatFilter,
+                        text = catLabel,
                         icon = Icons.Default.Category,
                         onClick = onCategoryClick
                     )
@@ -943,37 +980,57 @@ private fun AnalyticsFilterBar(
                         onDismissRequest = onCategoryDismiss,
                         shape = MaterialTheme.shapes.large
                     ) {
-                        SelectableDropdownMenuItem(
-                            selected = categoryFilter == null,
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.analytics_filter_all_categories)) },
-                            shapes = MenuDefaults.itemShape(0, availableCategories.size + 1),
-                            colors = MenuDefaults.selectableItemColors(containerColor = Color.Transparent),
-                            leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
-                            selectedLeadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                            onClick = { onCategorySelected(null) }
+                            leadingIcon = {
+                                Checkbox(
+                                    checked = isAllSelected,
+                                    onCheckedChange = null
+                                )
+                            },
+                            trailingIcon = {
+                                Icon(Icons.Default.Category, contentDescription = null, modifier = Modifier.size(Dimensions.Icon.small))
+                            },
+                            onClick = onToggleAllCategories
                         )
 
-                        availableCategories.forEachIndexed { index, category ->
-                            SelectableDropdownMenuItem(
-                                selected = categoryFilter == category,
-                                text = {
-                                    Text(
-                                        categoryLabel(category),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                shapes = MenuDefaults.itemShape(index + 1, availableCategories.size + 1),
-                                colors = MenuDefaults.selectableItemColors(containerColor = Color.Transparent),
-                                leadingIcon = {
-                                    CategoryIcon(
-                                        category = category,
-                                        size = Dimensions.Icon.small
-                                    )
-                                },
-                                selectedLeadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                                onClick = { onCategorySelected(category) }
-                            )
+                        HorizontalDivider()
+
+                        val organizedCategories = remember(availableCategories, categoryParentOf) {
+                            organizeHierarchicalCategories(availableCategories, categoryParentOf)
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 320.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            organizedCategories.forEach { category ->
+                                val isChild = category in categoryParentOf
+                                DropdownMenuItem(
+                                    modifier = if (isChild) Modifier.padding(start = Spacing.lg) else Modifier,
+                                    text = {
+                                        Text(
+                                            categoryLabel(category),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Checkbox(
+                                            checked = category in selectedCategories,
+                                            onCheckedChange = null
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        CategoryIcon(
+                                            category = category,
+                                            size = Dimensions.Icon.small
+                                        )
+                                    },
+                                    onClick = { onCategoryToggled(category) }
+                                )
+                            }
                         }
                     }
                 }
@@ -982,14 +1039,19 @@ private fun AnalyticsFilterBar(
 
         if (accountOptions.isNotEmpty()) {
             item {
-                val selectedAccountLabel =
-                    accountOptions.firstOrNull { it.key == accountFilter }?.label
+                val selectedAccounts = accountsFilter?.toSet()
+                    ?: accountFilter?.let { setOf(it) }
+                    ?: accountOptions.map { it.key }.toSet()
+                val isAllSelected = accountOptions.isNotEmpty() && selectedAccounts.size == accountOptions.size && accountFilter == null
+                val hasAccFilter = !isAllSelected
+                val accLabel = accountFilterChipLabel(accountFilter, accountsFilter, accountOptions)
+
                 Box {
                     ExpressiveFilterChip(
                         colors = analyticsFilterChipColors(),
-                        border = analyticsFilterChipBorder(selected = accountFilter != null),
-                        selected = accountFilter != null,
-                        text = selectedAccountLabel ?: stringResource(R.string.analytics_filter_account),
+                        border = analyticsFilterChipBorder(selected = hasAccFilter),
+                        selected = hasAccFilter,
+                        text = accLabel,
                         icon = Icons.Default.AccountBalanceWallet,
                         onClick = onAccountClick
                     )
@@ -999,31 +1061,52 @@ private fun AnalyticsFilterBar(
                         onDismissRequest = onAccountDismiss,
                         shape = MaterialTheme.shapes.large
                     ) {
-                        SelectableDropdownMenuItem(
-                            selected = accountFilter == null,
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.analytics_filter_all_accounts)) },
-                            shapes = MenuDefaults.itemShape(0, accountOptions.size + 1),
-                            colors = MenuDefaults.selectableItemColors(containerColor = Color.Transparent),
-                            leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) },
-                            selectedLeadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                            onClick = { onAccountSelected(null) }
+                            leadingIcon = {
+                                Checkbox(
+                                    checked = isAllSelected,
+                                    onCheckedChange = null
+                                )
+                            },
+                            trailingIcon = {
+                                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(Dimensions.Icon.small))
+                            },
+                            onClick = onToggleAllAccounts
                         )
-                        accountOptions.forEachIndexed { index, option ->
-                            SelectableDropdownMenuItem(
-                                selected = accountFilter == option.key,
-                                text = {
-                                    Text(
-                                        option.label,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                shapes = MenuDefaults.itemShape(index + 1, accountOptions.size + 1),
-                                colors = MenuDefaults.selectableItemColors(containerColor = Color.Transparent),
-                                leadingIcon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) },
-                                selectedLeadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
-                                onClick = { onAccountSelected(option.key) }
-                            )
+
+                        HorizontalDivider()
+
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 320.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            accountOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            option.label,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Checkbox(
+                                            checked = option.key in selectedAccounts,
+                                            onCheckedChange = null
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.AccountBalanceWallet,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(Dimensions.Icon.small)
+                                        )
+                                    },
+                                    onClick = { onAccountToggled(option.key) }
+                                )
+                            }
                         }
                     }
                 }
@@ -1209,5 +1292,76 @@ private fun EmptyAnalyticsState(
             actionLabel = stringResource(R.string.analytics_empty_action),
             onAction = onScanSmsClick
         )
+    }
+}
+
+/**
+ * Organizes available categories into hierarchical order: top-level categories first,
+ * with each parent's children nested immediately underneath it.
+ */
+internal fun organizeHierarchicalCategories(
+    availableCategories: List<String>,
+    parentOf: Map<String, String>
+): List<String> {
+    if (availableCategories.isEmpty()) return emptyList()
+    val childrenByParent = availableCategories
+        .filter { it in parentOf }
+        .groupBy { parentOf[it]!! }
+
+    val topLevel = availableCategories
+        .filter { it !in parentOf }
+        .sorted()
+
+    val result = mutableListOf<String>()
+    val visited = mutableSetOf<String>()
+
+    for (parent in topLevel) {
+        result.add(parent)
+        visited.add(parent)
+        val children = childrenByParent[parent].orEmpty().sorted()
+        for (child in children) {
+            result.add(child)
+            visited.add(child)
+        }
+    }
+
+    val orphans = availableCategories.filter { it !in visited }.sorted()
+    result.addAll(orphans)
+    return result
+}
+
+@Composable
+internal fun categoryFilterChipLabel(
+    single: String?,
+    selected: List<String>?,
+    available: List<String>
+): String {
+    val selectedSet = selected?.toSet()
+        ?: single?.let { setOf(it) }
+        ?: available.toSet()
+
+    return when {
+        selectedSet.isEmpty() -> stringResource(R.string.analytics_filter_category_none)
+        available.isNotEmpty() && selectedSet.size == available.size && single == null ->
+            stringResource(R.string.analytics_filter_category_all)
+        else -> stringResource(R.string.analytics_filter_category_custom)
+    }
+}
+
+@Composable
+internal fun accountFilterChipLabel(
+    single: String?,
+    selected: List<String>?,
+    available: List<com.pennywiseai.tracker.presentation.common.AccountOption>
+): String {
+    val selectedSet = selected?.toSet()
+        ?: single?.let { setOf(it) }
+        ?: available.map { it.key }.toSet()
+
+    return when {
+        selectedSet.isEmpty() -> stringResource(R.string.analytics_filter_account_none)
+        available.isNotEmpty() && selectedSet.size == available.size && single == null ->
+            stringResource(R.string.analytics_filter_account_all)
+        else -> stringResource(R.string.analytics_filter_account_custom)
     }
 }
