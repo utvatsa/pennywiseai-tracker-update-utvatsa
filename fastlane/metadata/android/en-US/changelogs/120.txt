@@ -1,0 +1,1 @@
+• Filter analytics by multiple categories and bank accounts simultaneously using checkboxes

@@ -1,5 +1,1 @@
-Version 3.6.1-utvatsa
-
-New Features:
-• 
-
+• Filter analytics by multiple categories and bank accounts simultaneously using checkboxes
