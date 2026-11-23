@@ -1,1 +1,3 @@
-• Filter analytics by multiple categories and bank accounts simultaneously using checkboxes
+• Analytics category filter now supports hierarchical multi-select — tap a parent category to select or deselect all its subcategories at once
+• Tri-state checkboxes show at a glance when a category is fully selected, partially selected, or unselected
+• Category filter updates apply instantly with no flicker or layout jump
