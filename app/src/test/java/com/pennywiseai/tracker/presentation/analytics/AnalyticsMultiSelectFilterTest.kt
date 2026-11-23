@@ -129,6 +129,72 @@ class AnalyticsMultiSelectFilterTest {
     }
 
     @Test
+    fun `hierarchical toggleCategory unselecting child also unselects parent`() = runTest {
+        val testCats = listOf(
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 1, name = "Food & Dining", color = "#FF0000", parentId = null),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 2, name = "Groceries", color = "#00FF00", parentId = 1),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 3, name = "Restaurants", color = "#0000FF", parentId = 1),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 4, name = "Shopping", color = "#FFFF00", parentId = null)
+        )
+        every { categoryRepository.getAllCategories() } returns flowOf(testCats)
+        val vm = AnalyticsViewModel(
+            context = context,
+            transactionRepository = transactionRepository,
+            userPreferencesRepository = userPreferencesRepository,
+            currencyConversionService = currencyConversionService,
+            accountBalanceRepository = accountBalanceRepository,
+            profileRepository = profileRepository,
+            categoryRepository = categoryRepository,
+            tagRepository = tagRepository,
+            entitlementGate = entitlementGate,
+            savedStateHandle = savedStateHandle
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+        val available = listOf("Food & Dining", "Groceries", "Restaurants", "Shopping")
+
+        // Unselect "Restaurants" -> "Restaurants" AND "Food & Dining" parent are removed
+        vm.toggleCategory("Restaurants", available)
+        assertEquals(listOf("Groceries", "Shopping"), vm.categoriesFilter.value)
+
+        // Reselect "Restaurants" -> all children selected -> parent re-selected -> all selected (null)
+        vm.toggleCategory("Restaurants", available)
+        assertNull(vm.categoriesFilter.value)
+    }
+
+    @Test
+    fun `hierarchical toggleCategory clicking parent toggles parent and all children`() = runTest {
+        val testCats = listOf(
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 1, name = "Food & Dining", color = "#FF0000", parentId = null),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 2, name = "Groceries", color = "#00FF00", parentId = 1),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 3, name = "Restaurants", color = "#0000FF", parentId = 1),
+            com.pennywiseai.tracker.data.database.entity.CategoryEntity(id = 4, name = "Shopping", color = "#FFFF00", parentId = null)
+        )
+        every { categoryRepository.getAllCategories() } returns flowOf(testCats)
+        val vm = AnalyticsViewModel(
+            context = context,
+            transactionRepository = transactionRepository,
+            userPreferencesRepository = userPreferencesRepository,
+            currencyConversionService = currencyConversionService,
+            accountBalanceRepository = accountBalanceRepository,
+            profileRepository = profileRepository,
+            categoryRepository = categoryRepository,
+            tagRepository = tagRepository,
+            entitlementGate = entitlementGate,
+            savedStateHandle = savedStateHandle
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+        val available = listOf("Food & Dining", "Groceries", "Restaurants", "Shopping")
+
+        // When all selected: clicking parent unselects parent and ALL its children
+        vm.toggleCategory("Food & Dining", available)
+        assertEquals(listOf("Shopping"), vm.categoriesFilter.value)
+
+        // When partially/none selected: clicking parent selects parent and ALL its children
+        vm.toggleCategory("Food & Dining", available)
+        assertNull(vm.categoriesFilter.value)
+    }
+
+    @Test
     fun `toggleAllCategories toggles between All and None`() = runTest {
         val available = listOf("Food", "Shopping", "Transport")
         // Initial state is All (null) -> toggleAllCategories should unselect all (emptyList)

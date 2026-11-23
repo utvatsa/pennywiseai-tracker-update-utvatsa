@@ -108,9 +108,14 @@ class AnalyticsViewModel @Inject constructor(
         val parentOf: Map<String, String>,
         val all: List<com.pennywiseai.tracker.data.database.entity.CategoryEntity>
     )
-    private val categoryIndex: Flow<CategoryIndex> =
+    private val categoryIndex: StateFlow<CategoryIndex> =
         categoryRepository.getAllCategories()
             .map { cats -> CategoryIndex(cats.associate { it.name to it.color }, cats.parentNameOf(), cats) }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                CategoryIndex(emptyMap(), emptyMap(), emptyList())
+            )
 
     // Profile filter — reuses the global Home profile selection so the two stay in sync.
     val selectedProfileId: StateFlow<Long?> = userPreferencesRepository.selectedProfileId
@@ -286,7 +291,11 @@ class AnalyticsViewModel @Inject constructor(
         // Groceries half of a Coffee/Groceries split) still roll into their parent.
         val effectiveCategories = filterState.categoriesFilter
             ?: filterState.categoryFilter?.let { listOf(it) }
-        val parentOf = catIndex.parentOf - (effectiveCategories ?: emptyList()).toSet()
+        val parentOf = if (filterState.categoriesFilter != null) {
+            catIndex.parentOf
+        } else {
+            catIndex.parentOf - (effectiveCategories ?: emptyList()).toSet()
+        }
         // Determine date range based on selected period. The two "month"
         // periods are special: they follow the user's custom budget cycle
         // (e.g. 25th → 24th) instead of the calendar month, so the analytics
@@ -379,18 +388,34 @@ class AnalyticsViewModel @Inject constructor(
                     analyticsRowsFor(allTransactionsWithSplits, filterState.typeFilter)
 
                 // Compute available categories BEFORE applying category filter
-                val allCategoryNames = filteredTransactionsWithSplits
+                val directCategories = filteredTransactionsWithSplits
                     .map { txWithSplits -> txWithSplits.getAmountByCategory().keys }
                     .flatten()
                     .map { it.ifEmpty { "Others" } }
                     .distinct()
+                val allCategoryNames = (directCategories + directCategories.mapNotNull { catIndex.parentOf[it] })
+                    .distinct()
                     .sorted()
 
                 // Apply category filter
-                // A parent category filter includes its sub-categories (#374).
+                // In multi-select mode: only explicitly selected categories (and parents
+                // whose children are selected, for direct parent spend) are included.
+                // In single-select mode: parent includes its sub-categories (#374).
                 val effectiveCategories = filterState.categoriesFilter
                     ?: filterState.categoryFilter?.let { listOf(it) }
-                val categoryFilterSet = effectiveCategories?.let { catIndex.all.expandWithChildren(it) }
+                val categoryFilterSet: Set<String>? = when {
+                    filterState.categoriesFilter != null -> {
+                        val selected = filterState.categoriesFilter.toSet()
+                        val set = selected.toMutableSet()
+                        for (cat in selected) {
+                            val parent = parentOf[cat]
+                            if (parent != null) set.add(parent)
+                        }
+                        set
+                    }
+                    effectiveCategories != null -> catIndex.all.expandWithChildren(effectiveCategories)
+                    else -> null
+                }
                 val categoryFilteredWithSplits = categoryFilterSet?.let { set ->
                     filteredTransactionsWithSplits.filter { txWithSplits ->
                         txWithSplits.getAmountByCategory().keys
@@ -399,27 +424,39 @@ class AnalyticsViewModel @Inject constructor(
                     }
                 } ?: filteredTransactionsWithSplits
 
-                val filteredTransactions = categoryFilteredWithSplits.map { it.transaction }
                 val displayCurrency = _selectedCurrency.value
 
-                // Calculate total — convert if unified mode
+                // Calculate total — convert if unified mode, counting only matching split amounts
                 var totalSpending = BigDecimal.ZERO
-                // In unified mode, count only rows that actually converted, so the
-                // count and average stay consistent with totalSpending rather than
-                // including rows whose amount was skipped (#670).
                 var unifiedConvertedCount = 0
                 if (isUnified) {
-                    for (tx in filteredTransactions) {
-                        // No known rate ever → leave the row out; face-valuing a
-                        // foreign amount into displayCurrency corrupts the total (#670).
-                        totalSpending += currencyConversionService
-                            .convertAmountOrNull(tx.amount, tx.currency, displayCurrency) ?: continue
-                        unifiedConvertedCount++
+                    for (txWithSplits in categoryFilteredWithSplits) {
+                        val matchingSplits = txWithSplits.getAmountByCategory().filterKeys {
+                            categoryFilterSet == null || it.ifEmpty { "Others" } in categoryFilterSet
+                        }
+                        var txConverted = BigDecimal.ZERO
+                        var hadConversion = false
+                        for ((_, amount) in matchingSplits) {
+                            val converted = currencyConversionService.convertAmountOrNull(
+                                amount, txWithSplits.transaction.currency, displayCurrency
+                            ) ?: continue
+                            txConverted += converted
+                            hadConversion = true
+                        }
+                        if (hadConversion) {
+                            totalSpending += txConverted
+                            unifiedConvertedCount++
+                        }
                     }
                 } else {
-                    totalSpending = filteredTransactions.sumOf { it.amount }
+                    for (txWithSplits in categoryFilteredWithSplits) {
+                        val matchingSplits = txWithSplits.getAmountByCategory().filterKeys {
+                            categoryFilterSet == null || it.ifEmpty { "Others" } in categoryFilterSet
+                        }
+                        totalSpending += matchingSplits.values.sumOf { it }
+                    }
                 }
-                val effectiveCount = if (isUnified) unifiedConvertedCount else filteredTransactions.size
+                val effectiveCount = if (isUnified) unifiedConvertedCount else categoryFilteredWithSplits.size
 
                 // Build category breakdown considering splits
                 val categoryAmounts = mutableMapOf<String, BigDecimal>()
@@ -433,6 +470,9 @@ class AnalyticsViewModel @Inject constructor(
                     val fromCurrency = txWithSplits.transaction.currency
                     txWithSplits.getAmountByCategory().forEach { (category, amount) ->
                         val rawCategory = category.ifEmpty { "Others" }
+                        if (categoryFilterSet != null && rawCategory !in categoryFilterSet) {
+                            return@forEach
+                        }
                         val parentName = parentOf[rawCategory]
                         val categoryName = parentName ?: rawCategory
                         val converted = if (isUnified) {
@@ -534,13 +574,26 @@ class AnalyticsViewModel @Inject constructor(
                 // Every counted row with its amount in the view's currency, converted
                 // once for the tag, account and weekday groups (#422). Unified mode
                 // leaves out a never-rated pair rather than face-value it (#670).
-                val counted = filteredTransactions.mapNotNull { tx ->
-                    if (isUnified) {
-                        currencyConversionService.convertAmountOrNull(tx.amount, tx.currency, displayCurrency)
+                val counted = categoryFilteredWithSplits.mapNotNull { tw ->
+                    val tx = tw.transaction
+                    val splitSum = tw.getAmountByCategory().entries
+                        .filter { categoryFilterSet == null || it.key.ifEmpty { "Others" } in categoryFilterSet }
+                        .fold(BigDecimal.ZERO) { acc, e -> acc + e.value }
+                    if (splitSum <= BigDecimal.ZERO) null
+                    else if (isUnified) {
+                        currencyConversionService.convertAmountOrNull(splitSum, tx.currency, displayCurrency)
                             ?.let { CountedRow(tx, Money(it, displayCurrency)) }
                     } else {
-                        CountedRow(tx, Money(tx.amount, tx.currency))
+                        CountedRow(tx, Money(splitSum, tx.currency))
                     }
+                }
+
+                val trendTransactions = categoryFilteredWithSplits.mapNotNull { tw ->
+                    val splitSum = tw.getAmountByCategory().entries
+                        .filter { categoryFilterSet == null || it.key.ifEmpty { "Others" } in categoryFilterSet }
+                        .fold(BigDecimal.ZERO) { acc, e -> acc + e.value }
+                    if (splitSum <= BigDecimal.ZERO) null
+                    else tw.transaction.copy(amount = splitSum)
                 }
 
                 // Tags overlap, unlike categories: a transaction counts in full under
@@ -562,7 +615,7 @@ class AnalyticsViewModel @Inject constructor(
                 val tagsOverlap = counted.any { (tagMap[it.tx.id]?.size ?: 0) > 1 }
 
                 // Group by merchant — convert if unified
-                val merchantBreakdown = filteredTransactions
+                val merchantBreakdown = trendTransactions
                     .groupBy { it.merchantName }
                     .entries
                     .map { (merchant, txns) ->
@@ -668,7 +721,7 @@ class AnalyticsViewModel @Inject constructor(
                     currency = displayCurrency,
                     isLoading = false,
                     spendingTrend = calculateSpendingTrend(
-                        filteredTransactions, dateRange.first, dateRange.second, isUnified, displayCurrency, refunds.byDay
+                        trendTransactions, dateRange.first, dateRange.second, isUnified, displayCurrency, refunds.byDay
                     ),
                     availableCategories = allCategoryNames,
                     refundNettedFromTotal = refundNettedFromTotal,
@@ -695,18 +748,24 @@ class AnalyticsViewModel @Inject constructor(
         isUnified: Boolean,
         displayCurrency: String
     ): BigDecimal {
-        val amountOf: suspend (TransactionEntity) -> BigDecimal? = { tx ->
-            if (isUnified) currencyConversionService.convertAmountOrNull(tx.amount, tx.currency, displayCurrency)
-            else tx.amount
+        val amountOf: suspend (BigDecimal, String) -> BigDecimal? = { amt, curr ->
+            if (isUnified) currencyConversionService.convertAmountOrNull(amt, curr, displayCurrency)
+            else amt
         }
         var total = BigDecimal.ZERO
         for (tw in analyticsRowsFor(rows, filter)) {
-            if (categoryFilter != null &&
-                tw.getAmountByCategory().keys.none { it.ifEmpty { "Others" } in categoryFilter }
-            ) continue
-            total += amountOf(tw.transaction) ?: continue // never-rated pair (#670)
+            val matchingSplits = tw.getAmountByCategory().filterKeys {
+                categoryFilter == null || it.ifEmpty { "Others" } in categoryFilter
+            }
+            if (matchingSplits.isEmpty()) continue
+            val splitSum = matchingSplits.values.sumOf { it }
+            total += amountOf(splitSum, tw.transaction.currency) ?: continue // never-rated pair (#670)
         }
-        return netOf(total, refundNetting(rows, filter, categoryFilter, parentOf, amountOf).total)
+        val refundTotal = refundNetting(rows, filter, categoryFilter, parentOf) { tx ->
+            if (isUnified) currencyConversionService.convertAmountOrNull(tx.amount, tx.currency, displayCurrency)
+            else tx.amount
+        }.total
+        return netOf(total, refundTotal)
     }
 
     fun selectPeriod(period: TimePeriod) {
@@ -746,21 +805,60 @@ class AnalyticsViewModel @Inject constructor(
     }
 
     /**
-     * Include/exclude one category in the analytics filter. The effective
-     * selection starts as "everything available"; unticking narrows it, and
-     * ticking the last one back returns to no filter. Unticking all keeps
-     * an empty selection (None).
+     * Include/exclude one category in the analytics filter.
+     * When toggling a parent category:
+     * - If all of its children (and the parent) are currently selected, deselects the parent and all children.
+     * - Otherwise, selects the parent and all its children.
+     * When toggling a child category:
+     * - If currently selected, deselects it. Also deselects its parent since not all children are selected.
+     * - If currently unselected, selects it. If all siblings are now selected, also selects its parent.
      */
     fun toggleCategory(category: String, available: List<String>) {
-        val current = _categoriesFilter.value
+        val parentOf = categoryIndex.value.parentOf
+        val childrenByParent = available
+            .filter { it in parentOf }
+            .groupBy { parentOf[it]!! }
+        val children = childrenByParent[category].orEmpty()
+        val isParent = children.isNotEmpty()
+        val isChild = category in parentOf
+
+        val current = (_categoriesFilter.value
             ?: _categoryFilter.value?.let { listOf(it) }
-            ?: available
-        val next = if (category in current) current - category else current + category
+            ?: available).toMutableSet()
+
+        if (isParent) {
+            val family = listOf(category) + children
+            val allFamilySelected = family.all { it in current }
+            if (allFamilySelected) {
+                current.removeAll(family.toSet())
+            } else {
+                current.addAll(family)
+            }
+        } else if (isChild) {
+            val parent = parentOf[category]!!
+            val siblingsAndSelf = childrenByParent[parent].orEmpty()
+            if (category in current) {
+                current.remove(category)
+                current.remove(parent)
+            } else {
+                current.add(category)
+                if (siblingsAndSelf.all { it in current }) {
+                    current.add(parent)
+                }
+            }
+        } else {
+            if (category in current) {
+                current.remove(category)
+            } else {
+                current.add(category)
+            }
+        }
+
         _categoryFilter.value = null
         _categoriesFilter.value = when {
-            next.isEmpty() -> emptyList()
-            next.toSet() == available.toSet() -> null
-            else -> next.filter { it in available }
+            current.isEmpty() -> emptyList()
+            current.containsAll(available) && available.containsAll(current) -> null
+            else -> available.filter { it in current }
         }
     }
 
