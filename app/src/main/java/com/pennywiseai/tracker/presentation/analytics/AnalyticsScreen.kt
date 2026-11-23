@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -980,12 +981,18 @@ private fun AnalyticsFilterBar(
                         onDismissRequest = onCategoryDismiss,
                         shape = MaterialTheme.shapes.large
                     ) {
+                        val allCategoriesToggleState = when {
+                            isAllSelected -> ToggleableState.On
+                            selectedCategories.isEmpty() -> ToggleableState.Off
+                            else -> ToggleableState.Indeterminate
+                        }
+
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.analytics_filter_all_categories)) },
                             leadingIcon = {
-                                Checkbox(
-                                    checked = isAllSelected,
-                                    onCheckedChange = null
+                                TriStateCheckbox(
+                                    state = allCategoriesToggleState,
+                                    onClick = null
                                 )
                             },
                             trailingIcon = {
@@ -1000,36 +1007,66 @@ private fun AnalyticsFilterBar(
                             organizeHierarchicalCategories(availableCategories, categoryParentOf)
                         }
 
+                        val childrenByParent = remember(availableCategories, categoryParentOf) {
+                            availableCategories
+                                .filter { it in categoryParentOf }
+                                .groupBy { categoryParentOf[it]!! }
+                        }
+
                         Column(
                             modifier = Modifier
                                 .heightIn(max = 320.dp)
                                 .verticalScroll(rememberScrollState())
                         ) {
                             organizedCategories.forEach { category ->
-                                val isChild = category in categoryParentOf
-                                DropdownMenuItem(
-                                    modifier = if (isChild) Modifier.padding(start = Spacing.lg) else Modifier,
-                                    text = {
-                                        Text(
-                                            categoryLabel(category),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Checkbox(
-                                            checked = category in selectedCategories,
-                                            onCheckedChange = null
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        CategoryIcon(
-                                            category = category,
-                                            size = Dimensions.Icon.small
-                                        )
-                                    },
-                                    onClick = { onCategoryToggled(category) }
-                                )
+                                key(category) {
+                                    val isChild = category in categoryParentOf
+                                    val children = childrenByParent[category].orEmpty()
+                                    val isParent = children.isNotEmpty()
+
+                                    val leadingCheckbox: @Composable () -> Unit = if (isParent) {
+                                        val family = listOf(category) + children
+                                        val selectedInFamily = family.count { it in selectedCategories }
+                                        val state = when {
+                                            selectedInFamily == family.size -> ToggleableState.On
+                                            selectedInFamily == 0 -> ToggleableState.Off
+                                            else -> ToggleableState.Indeterminate
+                                        }
+                                        {
+                                            TriStateCheckbox(
+                                                state = state,
+                                                onClick = null
+                                            )
+                                        }
+                                    } else {
+                                        val isChecked = category in selectedCategories
+                                        {
+                                            Checkbox(
+                                                checked = isChecked,
+                                                onCheckedChange = null
+                                            )
+                                        }
+                                    }
+
+                                    DropdownMenuItem(
+                                        modifier = if (isChild) Modifier.padding(start = Spacing.lg) else Modifier,
+                                        text = {
+                                            Text(
+                                                categoryLabel(category),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        leadingIcon = leadingCheckbox,
+                                        trailingIcon = {
+                                            CategoryIcon(
+                                                category = category,
+                                                size = Dimensions.Icon.small
+                                            )
+                                        },
+                                        onClick = { onCategoryToggled(category) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1061,12 +1098,18 @@ private fun AnalyticsFilterBar(
                         onDismissRequest = onAccountDismiss,
                         shape = MaterialTheme.shapes.large
                     ) {
+                        val allAccountsToggleState = when {
+                            isAllSelected -> ToggleableState.On
+                            selectedAccounts.isEmpty() -> ToggleableState.Off
+                            else -> ToggleableState.Indeterminate
+                        }
+
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.analytics_filter_all_accounts)) },
                             leadingIcon = {
-                                Checkbox(
-                                    checked = isAllSelected,
-                                    onCheckedChange = null
+                                TriStateCheckbox(
+                                    state = allAccountsToggleState,
+                                    onClick = null
                                 )
                             },
                             trailingIcon = {
@@ -1083,29 +1126,31 @@ private fun AnalyticsFilterBar(
                                 .verticalScroll(rememberScrollState())
                         ) {
                             accountOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            option.label,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Checkbox(
-                                            checked = option.key in selectedAccounts,
-                                            onCheckedChange = null
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        Icon(
-                                            Icons.Default.AccountBalanceWallet,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(Dimensions.Icon.small)
-                                        )
-                                    },
-                                    onClick = { onAccountToggled(option.key) }
-                                )
+                                key(option.key) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                option.label,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Checkbox(
+                                                checked = option.key in selectedAccounts,
+                                                onCheckedChange = null
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                Icons.Default.AccountBalanceWallet,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(Dimensions.Icon.small)
+                                            )
+                                        },
+                                        onClick = { onAccountToggled(option.key) }
+                                    )
+                                }
                             }
                         }
                     }
